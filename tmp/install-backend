@@ -1,0 +1,74 @@
+echo "THIS IS AN INSTALLION SCRIPT, DO NOT RUN ON YOUR ENVIRONMENT"
+echo "NOW THAT YOU HAVE BEEN WARNED, DO YOU WISH TO INSTALL THE APPLICATION"
+echo "THIS IS DESTRUCTIVE FOR DEVELOPMENT SOURCES"
+echo "CONTINUE ? y/N"
+
+while true; do
+    case $yn in
+        [Yy]* ) break;;
+        [Nn]* ) exit;;
+        * ) echo "Please answer yes or no.";;
+    esac
+done
+
+sudo add-apt-repository ppa:deadsnakes/ppa -y
+
+sudo apt update -y
+sudo apt upgrade -y
+
+sudo apt-get install python3-certbot-nginx
+sudo apt install unzip
+
+sudo apt install gcc -y
+sudo apt install libpq-dev -y
+sudo apt install python3.8 -y
+sudo apt install python3.8-dev -y
+sudo apt install python3.8-distutils -y
+
+unzip backend.zip
+cd backend/
+
+rm .gitignore .pylintrc
+rm Dockerfile
+rm -rf __pycache__/
+rm dev-requirements.txt
+rm install-dev-dependencies.sh
+rm -rf tests/
+
+pip install -r requirements.txt
+pip install python3.8
+
+python3.8 -m pip install -r requirements.txt
+curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+python3.8 get-pip.py
+rm get-pip.py
+
+python3.8 -m pip install -r requirements.txt
+
+while true; do
+    read -p "do you want ot install the server in a production mode ? " yn
+    case $yn in
+        [Yy]* ) export PRODUCTION=True; break;;
+        [Nn]* ) export PRODUCTION=False; break;;
+        * ) echo "Please answer yes or no.";;
+    esac
+done
+
+read -rp "please enter the database url you want to use, empty will use memory database " url
+if [ "$url" != "" ] ; then
+  echo "$url"
+  export DATABASE_URL="$url";
+fi
+
+# lets get current crontab state
+crontab -l > mycron
+# echoing in our new custom crontab
+echo "@reboot /usr/bin/python3.8 /home/ubuntu/backend/app.py" >> mycron
+# install new cron file
+crontab mycron
+# cleaning tmp file
+rm mycron
+
+echo "IF YOU NEED TO RESTART THE SERVER, YOU CAN RUN"
+echo "sudo rm /var/run/crond.reboot"
+echo "sudo service cron restart"

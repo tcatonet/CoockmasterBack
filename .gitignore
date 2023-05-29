@@ -1,0 +1,9 @@
+__pycache__/
+.idea/
+node_modules
+cook_master-env/
+venv/
+cook_master/backend/develop.env
+cook_master/tests/logs/
+cook_master/tests/flask_test/logs/
+logs/

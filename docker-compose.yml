@@ -1,0 +1,44 @@
+version: '3.3'
+
+services:
+  # BACKEND
+  backend:
+    build:
+      context: cook_master/backend/
+      dockerfile: Dockerfile
+
+    env_file:
+      - cook_master/backend/develop.env
+
+    volumes:
+      - backend_vol:/usr/src/app/
+    ports:
+      - "127.0.0.1:5000:5000"
+
+  # database
+  db:
+    image: postgres:13-alpine
+    volumes:
+      - db_vol:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+      - POSTGRES_DB=geodata
+
+  # PGADMIN SERVICE
+#  pgadmin_georisk:
+#    environment:
+#      - PGADMIN_DEFAULT_EMAIL=remibraizet@gmail.com
+#      - PGADMIN_DEFAULT_PASSWORD=lol
+#      - PGADMIN_LISTEN_ADDRESS=0.0.0.0
+#      - PGADMIN_LISTEN_PORT=5434
+#    build:
+#      context: .
+#      dockerfile: Georisk/pgadmin/Dockerfile
+#    ports:
+#      - "5434:5434"
+
+volumes:
+  backend_vol:
+  db_vol:
+
