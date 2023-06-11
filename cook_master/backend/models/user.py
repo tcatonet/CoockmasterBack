@@ -8,6 +8,7 @@ from flask import jsonify
 import json
 from _datetime import datetime
 import uuid
+from models.ecommerce import Adress
 
 
 class User(db.Model):
@@ -15,10 +16,12 @@ class User(db.Model):
 
     __tablename__ = 'user'
     # items = db.relationship('projects', lazy='dynamic')
-  
+   
     id = db.Column(db.Integer, primary_key=True, unique=True)
     basket = db.relationship("Basket",  uselist=False, backref="user")
     orders = db.relationship('Order', back_populates='user')
+    adress = db.relationship('Adress', back_populates='user')
+    avis = db.relationship('Avis', back_populates='user')
 
     user_level = db.Column(db.Integer)
     code = db.Column(db.Integer)
@@ -28,7 +31,7 @@ class User(db.Model):
     registered_on = db.Column(db.DateTime, default=datetime.utcnow())
     verified = db.Column(db.String(36))  # stores an uuid
     phone = db.Column(db.String(10), default='00.00.00.00.00')
-    first_name = db.Column(db.String(80))
+    first_name = db.Column(db.String(80)) 
     last_name = db.Column(db.String(80))
     email_validate = db.Column(db.Boolean)
 
@@ -41,7 +44,7 @@ class User(db.Model):
         self.level = level
         self.registered_on = datetime.utcnow()
         self.verified = str(uuid.uuid4())
-
+ 
         self.phone = phone
         self.first_name = first_name
         self.last_name = last_name
@@ -147,8 +150,9 @@ class User(db.Model):
         orders_list = {'orders': []}
  
         for order in order_list:
-
-            obj = dict(id=order.id, prix=order.prix)
+            adress= Adress.find_by_id(id=order.adress_id, user_id=self.id)
+            order_adress = dict(city=adress.city, postcode=adress.postcode, adress=adress.adress)
+            obj = dict(id=order.id, prix=order.prix, adress=order_adress)
             orders_list['orders'].append(obj)
         return orders_list
 

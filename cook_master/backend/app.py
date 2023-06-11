@@ -22,7 +22,11 @@ from resources.product import ProductInStore
 from resources.product_in_basket import ProductBasket
 from resources.basket import UserBasket
 from resources.order import UserOrder
-
+from resources.adress import UserAdress
+from resources.room import CompanyRoom
+from resources.prestataire import CompanyPrestataire
+from resources.categorie import EventCatrgorie
+from resources.avis import UserAvis
 
 from resources.verification import app_verification, mail_resend
 from config import production, host, port, PROD_HOST, PROD_PORT, debug
@@ -44,7 +48,7 @@ jwt = JWT(app, authenticate, identity)
 
 # adding resources endpoints
 api = Api(app) 
-app.register_blueprint(app_online)
+app.register_blueprint(app_online) 
 app.register_blueprint(app_mapping)
 app.register_blueprint(adv_mapping)  
 
@@ -59,7 +63,13 @@ api.add_resource(ProductInStore, '/product')
 api.add_resource(ProductBasket, '/user_basket') 
 api.add_resource(UserBasket, '/basket')
 api.add_resource(UserOrder, '/user_order')
+api.add_resource(UserAdress, '/user_adress')
+api.add_resource(UserAvis, '/user_avis')
+api.add_resource(CompanyRoom, '/company_room')
+api.add_resource(CompanyPrestataire, '/company_prestataire')
+api.add_resource(EventCatrgorie, '/event_catrgorie')
 
+ 
 # we choose simply between dev and prod environment 
 if production:
     logging.warning('starting production server !') 
@@ -68,25 +78,25 @@ if production:
   
     ssl_args = {} 
     import os
-    if os.path.exists('server.key') and os.path.exists('server.crt'):
+    if os.path.exists('server.key') and os.path.exists('server.crt'): 
         ssl_args = {'keyfile': 'server.key',
                     'certfile': 'server.crt'}
      
     listening_at = (PROD_HOST, PROD_PORT)
     server = pywsgi.WSGIServer(listening_at, application=app, log=log, **ssl_args)
- 
-    def signal_handler(sig, frame):
-        server.close()
+  
+    def signal_handler(sig, frame):  
+        server.close() 
         app.logger.info('\nStopping server')
-
+ 
     signal.signal(signal.SIGINT, signal_handler)
-
+ 
     server.serve_forever()
     server.close()
-else:
+else: 
     logging.warning('starting development server !')
-     
+      
     # Name is only set to main when file is explicitly run (not on imports):
     if __name__ == "__main__":
-        app.run(host=host, port=port, debug=True)
- 
+        app.run(host=host, port=port, debug=True) 
+  

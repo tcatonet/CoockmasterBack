@@ -77,15 +77,8 @@ class UserRegister(Resource):
             abort(400, 'Missing required parameter in the JSON body')
         
         else:
-     
-            if data['email'] == "":
-                user_count = User.get_all_users()
-                print(user_count)
-                return json.dumps(user_count, sort_keys=True, ensure_ascii=False), 200
 
-            if not re.match(valid_email_regex, data['email']):
-                abort(400, 'wrong email format')
-            user = User.find_by_email(email=data['email'])
+            user = User.find_by_email(email=user.email)
             if user:
                 response = current_app.response_class(response=json.dumps(user.json()), status=200,
                                                       mimetype='application/json')
@@ -191,11 +184,11 @@ class UserRegister(Resource):
         """
         Finds a user by its email and deletes it.
     
-        :param email: the email of the user.
-        :type email: str
+        :param email: the email of the user. 
+        :type email: str 
         :return: success or failure.
         :rtype: application/json response.
-        """
+        """ 
         user.remove_from_db()
 
         response = current_app.response_class(response=json.dumps(dict(message='user deleted')), status=204, mimetype='application/json')
@@ -233,12 +226,12 @@ class UserRegister(Resource):
          
         try:
             data = parser.parse_args()
-            del parser
+            del parser 
 
         except Exception as e:
             logging.error(e)
             abort(400, 'Missing required parameter in the JSON body')
-        
+         
         else:
             if not re.match(valid_email_regex, data['email']):
                 abort(400, 'invalid email')

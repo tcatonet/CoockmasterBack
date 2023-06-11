@@ -48,10 +48,18 @@ class UserBasket(Resource):
             :return: basket json
             :rtype: application/json.
         """
-        try:
-            basket = Basket.find_by_user_id(user_id=user.id)
-            product_in_baskets = ProductInBasket.get_all(basket_id=basket.id)
-            products = Product.get_all_from_basket(product_in_baskets= product_in_baskets)
+        basket = Basket.find_by_user_id(user_id=user.id)
+
+        if not basket:
+            abort(405, 'Basket could not be found')
+        
+        product_in_baskets = ProductInBasket.get_all(basket_id=basket.id)
+        if not product_in_baskets:
+            abort(405, 'Product in basket could not be found')
+        
+        products = Product.get_all_from_basket(product_in_baskets= product_in_baskets)
+
+        try: 
 
             basket_price=0
             for p in products:
@@ -79,8 +87,12 @@ class UserBasket(Resource):
             :return: str
             :rtype: application/json.
         """
+
+        basket = Basket.find_by_user_id(user_id=user.id)
+        if not basket:
+            abort(405, 'Basket could not be found')
+
         try:
-            basket = Basket.find_by_user_id(user_id=user.id)
             product_in_baskets = ProductInBasket.get_all(basket_id= basket.id)
             Basket.delete_all_from_basket(product_in_baskets= product_in_baskets)
             response = current_app.response_class(response=json.dumps(dict(message='basket deleted')), status=200,

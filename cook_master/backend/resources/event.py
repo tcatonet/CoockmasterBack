@@ -10,20 +10,22 @@ from argparse import Namespace
 from flask import abort, current_app
 from flask_restful import Resource, reqparse
 
-from models.ecommerce import Product, Avis
+from models.event import Event
+from models.event import Prestataire, Room, Categorie
 
 
-class ProductInStore(Resource):
+class UserEvent(Resource):
 
     """ Product endpoint. """
 
     id = Namespace(name='id', default=0, dest="id", action='store', type=int)
-    store_id = Namespace(name='store_id', default=0, dest="store_id", action='store', type=int)
     name = Namespace(name='name', default=0, dest="name", action='store', type=str)
     description = Namespace(name='description', default=0, dest="description", action='store', type=str)
-    stock = Namespace(name='stock', default=0, dest="stock", action='store', type=int)
-    prix = Namespace(name='prix', default=0, dest="prix", action='store', type=float)
-    note = Namespace(name='note', default=0, dest="note", action='store', type=float)
+
+    categorie_id = Namespace(name='categorie_id', default=0, dest="categorie_id", action='store', type=int)
+
+    room_id = Namespace(name='room_id', default=0, dest="room_id", action='store', type=int)
+    prestataire_id = Namespace(name='prestataire_id', default=0, dest="prestataire_id", action='store', type=int)
 
  
     @staticmethod
@@ -57,9 +59,9 @@ class ProductInStore(Resource):
         parser = reqparse.RequestParser()
         parser.add_argument(**vars(self.__required__(self.name)))
         parser.add_argument(**vars(self.__required__(self.description)))
-        parser.add_argument(**vars(self.__required__(self.stock)))
-        parser.add_argument(**vars(self.__required__(self.prix)))
-        parser.add_argument(**vars(self.__required__(self.store_id)))
+        parser.add_argument(**vars(self.__required__(self.categorie_id)))
+        parser.add_argument(**vars(self.__optional__(self.room_id)))
+        parser.add_argument(**vars(self.__optional__(self.prestataire_id)))
 
         try:
             data = parser.parse_args()
@@ -70,20 +72,30 @@ class ProductInStore(Resource):
             abort(400, 'Missing required parameter in the JSON body')
         
         else:
-            product = Product(store_id=data['store_id'], name=data['name'], description=data['description'], stock=data['stock'], prix=data['prix'])
-            if not product:
-                abort(405, 'Product could not be found')
+
+            if 'room_id' not in data:
+                data['room_id']=-1
+
+            if 'prestataire_id' not in data:
+                data['prestataire_id']=-1
+
+            event = Event(name=data['name'], 
+                          description=data['description'], 
+                          categorie_id=data['categorie_id'], 
+                          room_id=data['room_id'], 
+                          prestataire_id=data['prestataire_id'])
+            if not event:
+                abort(405, 'Event could not be found')
 
             try:
-                product.add_to_db()
-
+                event.add_to_db()
 
             except Exception as e:
                 logging.error(e)
-                abort(422, 'An error occurred creating the product')
+                abort(422, 'An error occurred creating the event')
 
-            product_json = product.json(product_avis=[]) 
-            response = current_app.response_class(response=json.dumps(product_json), status=201,
+            event_json = event.json() 
+            response = current_app.response_class(response=json.dumps(event_json), status=201,
                                                 mimetype='application/json')
             return response
 
@@ -97,7 +109,7 @@ class ProductInStore(Resource):
             :rtype: application/json.
         """
         parser = reqparse.RequestParser()
-        parser.add_argument(**vars(self.__required__(self.name)))
+        parser.add_argument(**vars(self.__required__(self.id)))
 
         try:
             data = parser.parse_args()
@@ -109,22 +121,35 @@ class ProductInStore(Resource):
 
         else: 
 
-            product = Product.find_by_name(name=data['name'])
-            
-            if not product:
-                abort(405, 'Product could not be found')
-            
-            avis_list = Avis.find_all_by_product_id(product_id=product.id)
-            json_list_avis = Avis.all_json(avis_list)
+            if data['id']:
+                event = Event.find_by_id(id=data['id'])
 
+                prestataire = Prestataire.find_by_id(id=event.prestataire_id)
+                categorie = Categorie.find_by_id(id=event.categorie_id)
+                room = Room.find_by_id(id=event.room_id)
+
+                json_prestataire= prestataire.json()
+                json_categorie=categorie.json()
+                json_room=room.json()
+
+
+                json_event = event.json(json_prestataire=json_prestataire, json_categorie=json_categorie, json_room=json_room)
+            
+            else:
+                event_list=Event.find_all()
+                json_event = Event.all_json(event_list=event_list)
+
+            if not event:
+                abort(405, 'Event could not be found')
+            
             try:
-                response = current_app.response_class(response=json.dumps(product.json(product_avis=json_list_avis)), status=200,
+                response = current_app.response_class(response=json.dumps(json_event), status=200,
                                                       mimetype='application/json')
                 return response
 
             except Exception as e:
                 logging.error(e)
-                abort(400, 'An error occurred retrieving the product')
+                abort(400, 'An error occurred retrieving the event')
 
 
     def delete(self):
@@ -136,7 +161,7 @@ class ProductInStore(Resource):
             :rtype: application/json.
         """
         parser = reqparse.RequestParser()
-        parser.add_argument(**vars(self.__required__(self.name)))
+        parser.add_argument(**vars(self.__required__(self.id)))
 
         try:
             data = parser.parse_args()
@@ -147,12 +172,13 @@ class ProductInStore(Resource):
             abort(400, 'Missing required parameter in the JSON body')
 
         else:
-            product = Product.find_by_name(name=data['name'])
-            if not product:
-                abort(405, 'Product could not be found')
+            event = Event.find_by_id(id=data['id'])
+            if not event:
+                abort(405, 'Event could not be found')
 
-            product.remove_from_db()
-        response = current_app.response_class(response=json.dumps(dict(message='product deleted')), status=204, mimetype='application/json')
+            event.remove_from_db()
+
+        response = current_app.response_class(response=json.dumps(dict(message='event deleted')), status=204, mimetype='application/json')
 
         return response
 
@@ -170,10 +196,11 @@ class ProductInStore(Resource):
             :rtype: application/json.
         """
         parser = reqparse.RequestParser()
-        parser.add_argument(**vars(self.__required__(self.name)))
+        parser.add_argument(**vars(self.__required__(self.id)))
+        parser.add_argument(**vars(self.__optional__(self.name)))
         parser.add_argument(**vars(self.__optional__(self.description)))
-        parser.add_argument(**vars(self.__optional__(self.stock)))
-        parser.add_argument(**vars(self.__optional__(self.prix)))
+        parser.add_argument(**vars(self.__optional__(self.prestataire_id)))
+        parser.add_argument(**vars(self.__optional__(self.room_id)))
 
         try: 
             data = parser.parse_args()
@@ -189,17 +216,16 @@ class ProductInStore(Resource):
                 if data[key] and data[key] != '': 
                     keys_to_patch[key] = data[key]
 
-            product = Product.find_by_name(name=data['name'])
-            if not product:
-                abort(404, dict(message='Product could not be found'))
+            event = Event.find_by_id(id=data['id'])
+            if not event:
+                abort(404, dict(message='Event could not be found'))
 
             try:
-                product.patch_in_db(keys_to_patch)
+                event.patch_in_db(keys_to_patch)
                 
             except Exception as e:
                 logging.error(e) 
-                response = current_app.response_class(response=json.dumps(dict(message=keys_to_patch)), status=405, mimetype='application/json')
+                abort(405, dict(message='Cannot update vent'))
 
-                abort(405, 'Missing required parameter in the JSON body')
-            response = current_app.response_class(response=json.dumps(dict(message='product udpated')), status=204, mimetype='application/json')
+            response = current_app.response_class(response=json.dumps(dict(message='event udpated')), status=204, mimetype='application/json')
             return response

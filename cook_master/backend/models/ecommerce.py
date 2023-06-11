@@ -5,10 +5,10 @@ from db import db
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask import jsonify
 import json
-from _datetime import datetime
+from _datetime import datetime 
 import uuid
-
-
+ 
+ 
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True, unique=True)
     name = db.Column(db.String(50), unique=True)
@@ -21,6 +21,7 @@ class Product(db.Model):
     store = db.relationship("Store", back_populates="products")
     product_in_baskets = db.relationship('ProductInBasket', back_populates="product")
     products_in_order = db.relationship('ProductInOrder', back_populates="product")
+    avis = db.relationship('Avis', back_populates="product")
 
     def __init__(self, store_id, name, description, stock, prix):
         self.store_id = store_id
@@ -29,26 +30,26 @@ class Product(db.Model):
         self.stock = stock
         self.prix = prix
 
-    def __repr__(self):
-        return "<TableName(id='%s')>" % self.id
-
-    def json(self):
+    def __repr__(self): 
+        return "<TableName(id='%s')>" % self.id 
+ 
+    def json(self, product_avis):
         """
         Converts this store and all its items to JSON.
 
         :return: this store and all its items.
         :rtype: JSON.
         """
-        obj = dict(store_id=self.store_id, id=self.id, name=self.name, description=self.description, stock=self.stock, prix=self.prix)
+        obj = dict(store_id=self.store_id, id=self.id, name=self.name, note=self.note, description=self.description, stock=self.stock, prix=self.prix, product_avis=product_avis)
         response = jsonify(json.dumps(obj, ensure_ascii=False))
         response.headers["Content-Type"] = "application/json; charset=utf-8"
         return obj
 
     def add_to_db(self):
         """
-            Inserts this user in the DB.
+            Inserts this user in the DB.  
         """
-        db.session.add(self)
+        db.session.add(self) 
         db.session.commit()
 
     def patch_in_db(self, patch_values):
@@ -193,7 +194,6 @@ class ProductInBasket(db.Model):
         return cls.query.filter_by(id=id, basket_id=basket_id).first()
 
 
-
     @classmethod
     def get_all(cls, basket_id):
         """
@@ -207,13 +207,138 @@ class ProductInBasket(db.Model):
 
         return cls.query.filter_by(basket_id=basket_id)
 
+
+class Avis(db.Model):
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    product_in_order_id = db.Column(db.Integer, db.ForeignKey('product_in_order.id'))
+    product_in_order = db.relationship("ProductInOrder", back_populates="avis")
+
+    product_id = db.Column(db.Integer, db.ForeignKey('product.id'))
+    product = db.relationship("Product", back_populates="avis")
+
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    user = db.relationship("User", back_populates="avis")
+    username = db.Column(db.String(100))
+
+    note = db.Column(db.Integer)
+    comentary = db.Column(db.String(1000)) 
+
+    def json(self, user_name):
+        """
+        Converts this store and all its items to JSON.
+
+        :return: this store and all its items.
+        :rtype: JSON.
+        """ 
+        obj = dict(id=self.id, user_id=self.user_id, user_name=user_name,  note=self.note, comentary=self.comentary, product_id=self.product_id, product_in_order_id=self.product_in_order_id, )
+        response = jsonify(json.dumps(obj, ensure_ascii=False))
+        response.headers["Content-Type"] = "application/json; charset=utf-8"
+        return obj
+
+    def all_json(avis_list): 
+        """ 
+        Converts this store and all its items to JSON.
+
+        :return: this store and all its items.
+        :rtype: JSON.
+        """
+        json_avis = []
+        for avis in avis_list:
+            obj = dict(id=avis.id, user_id=avis.user_id, user_name=avis.username, note=avis.note, comentary=avis.comentary, product_id=avis.product_id, product_in_order_id=avis.product_in_order_id, )
+            json_avis.append(obj)
+
+        response = jsonify(json.dumps(json_avis, ensure_ascii=False))
+        response.headers["Content-Type"] = "application/json; charset=utf-8"
+        return json_avis
+    
+
+    def add_to_db(self):
+        """
+            Inserts this user in the DB.
+        """
+        db.session.add(self) 
+        db.session.commit() 
+
+    def patch_in_db(self, patch_values):
+        """
+            Update this basket in the DB.
+        """
+        num_rows_updated = self.query.filter_by(id=self.id).update(patch_values)
+        db.session.commit()
+        return num_rows_updated
+
+    def remove_from_db(self):
+        """
+            Deletes this user from the DB.
+        """
+        db.session.delete(self) 
+        db.session.commit()
+     
+    @classmethod
+    def find_by_id(cls, id, user_id):
+        """ 
+            Selects a user from the DB and returns it.
+
+            :param _id: the id of the user.
+            :type _id: int
+            :return: a user.
+            :rtype: UserModel.
+        """  
+         
+        return cls.query.filter_by(id=id, user_id=user_id).first()
+
+    @classmethod
+    def find_all(cls, user_id):
+        """ 
+            Selects a user from the DB and returns it.
+
+            :param _id: the id of the user.
+            :type _id: int
+            :return: a user. 
+            :rtype: UserModel.
+        """
+         
+        return cls.query.filter_by(user_id=user_id)
+    
+
+    @classmethod
+    def find_by_order_and_product(cls, product_in_order_id, product_id):
+        """ 
+            Selects a user from the DB and returns it.
+
+            :param _id: the id of the user.
+            :type _id: int
+            :return: a user.
+            :rtype: UserModel.
+        """  
+        return cls.query.filter_by(product_in_order_id=product_in_order_id, product_id=product_id).first()
+    
+    @classmethod
+    def find_all_by_product_id(cls, product_id):
+        """ 
+            Selects a user from the DB and returns it.
+
+            :param _id: the id of the user.
+            :type _id: int
+            :return: a user.
+            :rtype: UserModel.
+        """
+        return cls.query.filter_by(product_id=product_id)
+
+
 class ProductInOrder(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+
     order_id = db.Column(db.Integer, db.ForeignKey('order.id'))
     order = db.relationship("Order", back_populates="products_in_order")
 
     product_id = db.Column(db.Integer, db.ForeignKey('product.id'))
     product = db.relationship("Product", back_populates="products_in_order")
+
+    avis = db.relationship("Avis", back_populates="product_in_order")
+
     quantity = db.Column(db.Integer)
     prix = db.Column(db.Float)
 
@@ -226,10 +351,19 @@ class ProductInOrder(db.Model):
 
     def add_to_db(self):
         """
-            Inserts this user in the DB.
+            Inserts this user in the DB. 
         """
         db.session.add(self)
         db.session.commit()
+
+    @classmethod
+    def find_by_order_id(cls, order_id):
+        """
+            Inserts this user in the DB.
+        """
+        return cls.query.filter_by(order_id=order_id)
+
+
  
 
 class Basket(db.Model):
@@ -375,15 +509,105 @@ class Store(db.Model):
         return cls.query.filter_by(name=name).first()
 
 
+class Adress(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    city = db.Column(db.String(50))
+    postcode = db.Column(db.String(50))
+    adress = db.Column(db.String(50))
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    user = db.relationship("User", back_populates="adress")
+    orders = db.relationship('Order', back_populates='adress')
+
+    def json(self):
+        """
+        Converts this store and all its items to JSON.
+
+        :return: this store and all its items.
+        :rtype: JSON.
+        """
+        obj = dict(id=self.id, city=self.city, postcode=self.postcode, adress=self.adress)
+        response = jsonify(json.dumps(obj, ensure_ascii=False))
+        response.headers["Content-Type"] = "application/json; charset=utf-8"
+        return obj
+
+    def all_json(adress_list):
+        """
+        Converts this store and all its items to JSON.
+
+        :return: this store and all its items.
+        :rtype: JSON.
+        """
+        json_adress = []
+        for adress in adress_list:
+            obj = dict(id=adress.id, city=adress.city, postcode=adress.postcode, adress=adress.adress)
+            json_adress.append(obj)
+
+        response = jsonify(json.dumps(json_adress, ensure_ascii=False))
+        response.headers["Content-Type"] = "application/json; charset=utf-8"
+        return json_adress
+    
+    
+    def add_to_db(self):
+        """
+            Inserts this user in the DB.
+        """
+        db.session.add(self) 
+        db.session.commit() 
+
+    def patch_in_db(self, patch_values):
+        """
+            Update this basket in the DB.
+        """
+        num_rows_updated = self.query.filter_by(id=self.id).update(patch_values)
+        db.session.commit()
+        return num_rows_updated
+
+    def remove_from_db(self):
+        """
+            Deletes this user from the DB.
+        """
+        db.session.delete(self) 
+        db.session.commit()
+     
+    @classmethod
+    def find_by_id(cls, id, user_id):
+        """ 
+            Selects a user from the DB and returns it.
+
+            :param _id: the id of the user.
+            :type _id: int
+            :return: a user.
+            :rtype: UserModel.
+        """  
+        return cls.query.filter_by(id=id, user_id=user_id).first()
+
+    @classmethod
+    def find_all(cls, user_id):
+        """ 
+            Selects a user from the DB and returns it.
+
+            :param _id: the id of the user.
+            :type _id: int
+            :return: a user.
+            :rtype: UserModel.
+        """
+         
+        return cls.query.filter_by(user_id=user_id)
+     
+
+
+
 class Order(db.Model):
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    user = db.relationship("User", back_populates="orders")
+    adress_id = db.Column(db.Integer, db.ForeignKey('adress.id'))
+    adress = db.relationship("Adress", back_populates="orders")
     id = db.Column(db.Integer, primary_key=True)
     prix = db.Column(db.Integer)
     products_in_order = db.relationship('ProductInOrder', back_populates="order")
-    #order_list = db.relationship('OrderList', back_populates="order")
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    user = db.relationship("User", back_populates="orders")
     status = db.Column(db.String(50), unique=True)
-
+    invoice = db.Column(db.String(50), unique=True)
+    
 
     def add_to_db(self):
         """
@@ -402,67 +626,45 @@ class Order(db.Model):
         return num_rows_updated
     
 
-    def json(self):
+    def json(self, products_in_order, adress):
         """
         Converts this store and all its items to JSON.
 
-        :return: this store and all its items.
+        :return: this store and all its items. 
         :rtype: JSON.
         """
-        obj = dict(id=self.id, prix=self.prix)
+        order_adress = dict(city=adress.city, postcode=adress.postcode, adress=adress.adress)
+
+        json_products_in_order = []
+        for product_in_order in products_in_order:
+            obj = dict(id=product_in_order.id, 
+                       order_id=product_in_order.order_id, 
+                       product_id=product_in_order.product_id, 
+                       quantity=product_in_order.quantity, 
+                       prix=product_in_order.prix)
+            
+            json_products_in_order.append(obj)
+
+        obj = dict(id=self.id, prix=self.prix, status=self.status, adress=order_adress, products_in_order=json_products_in_order)
         response = jsonify(json.dumps(obj, ensure_ascii=False))
         response.headers["Content-Type"] = "application/json; charset=utf-8"
         return obj
-    
-
-    # def all_json(self, order_list):
-    #     """
-    #     Converts this store and all its items to JSON.
-
-    #     :return: this store and all its items. 
-    #     :rtype: JSON.
-    #     """
-
-    #     orders_list = {'orders': []}
-
-    #     for order in order_list:
-
-    #         obj = dict(id=order.id, price=order.price)
-    #         orders_list['orders'].append(obj)
-    #     return orders_list
- 
- 
-    # def json(self, product_list):
-    #     """
-    #     Converts this store and all its items to JSON.
-
-    #     :return: this store and all its items.
-    #     :rtype: JSON.
-    #     """
-
-    #     products_list = {'products': []}
-
-    #     for product in product_list:
-
-    #         obj = dict(id=product.id, price=product.price)
-    #         products_list['products'].append(obj)
-    #     return products_list
-
+  
 
     @classmethod
     def get_all(cls, user_id):
         """
             Selects a user from the DB and returns it.
 
-            :param _id: the id of the user.
+            :param _id: the id of the user.  
             :type _id: int
             :return: a user.
-            :rtype: UserModel.
+            :rtype: UserModel. 
         """
         
         return cls.query.filter_by(user_id=user_id).all()
 
-
+ 
     @classmethod
     def find_one_by_id(cls, id, user_id):
         """
@@ -475,44 +677,3 @@ class Order(db.Model):
         """
         
         return cls.query.filter_by(id=id, user_id=user_id).first()
-    
-
-# class OrderList(db.Model):
-#     id = db.Column(db.Integer, primary_key=True)
-#     order_id = db.Column(db.Integer, db.ForeignKey('order.id'))
-#     order = db.relationship("Order", back_populates="products")
-
-#     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-#     user = db.relationship("User", back_populates="orders")
-#     quantity = db.Column(db.Integer)
-
-#     @classmethod
-#     def find_by_user_id(cls, user_id):
-#         """
-#             Selects a user from the DB and returns it.
-
-#             :param _id: the id of the user.
-#             :type _id: int
-#             :return: a user.
-#             :rtype: UserModel.
-#         """
-        
-#         return cls.query.filter_by(user_id=user_id)
-
-
-
-#     def all_json(self, orders):
-#         """
-#         Converts this store and all its items to JSON.
-
-#         :return: this store and all its items.
-#         :rtype: JSON.
-#         """
-
-#         orders_list = {'orders': []}
-
-#         for order in orders:
-
-#             obj = dict(id=order.id, price=order.price)
-#             orders_list['orders'].append(obj)
-#         return orders_list

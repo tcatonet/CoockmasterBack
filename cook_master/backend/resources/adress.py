@@ -10,20 +10,19 @@ from argparse import Namespace
 from flask import abort, current_app
 from flask_restful import Resource, reqparse
 
-from models.ecommerce import Product, Avis
+from models.ecommerce import Adress
+from resources.verification import token_required
 
 
-class ProductInStore(Resource):
+class UserAdress(Resource):
 
     """ Product endpoint. """
 
     id = Namespace(name='id', default=0, dest="id", action='store', type=int)
-    store_id = Namespace(name='store_id', default=0, dest="store_id", action='store', type=int)
-    name = Namespace(name='name', default=0, dest="name", action='store', type=str)
-    description = Namespace(name='description', default=0, dest="description", action='store', type=str)
-    stock = Namespace(name='stock', default=0, dest="stock", action='store', type=int)
-    prix = Namespace(name='prix', default=0, dest="prix", action='store', type=float)
-    note = Namespace(name='note', default=0, dest="note", action='store', type=float)
+    user_id = Namespace(name='user_id', default=0, dest="user_id", action='store', type=int)
+    city = Namespace(name='city', default=0, dest="city", action='store', type=str)
+    postcode = Namespace(name='postcode', default=0, dest="postcode", action='store', type=str)
+    adress = Namespace(name='adress', default=0, dest="adress", action='store', type=str)
 
  
     @staticmethod
@@ -41,10 +40,11 @@ class ProductInStore(Resource):
         edit['required'] = False
         return local_args_namespace
     
-
-    def post(self):
+    
+    @token_required
+    def post(self, user):
         """
-            Post a Product
+            Get an Product
             :params:    name: name of the product to create
                         description: description of the product to create
                         stock: stock of the product to create
@@ -55,40 +55,37 @@ class ProductInStore(Resource):
             :rtype: application/json.
         """    
         parser = reqparse.RequestParser()
-        parser.add_argument(**vars(self.__required__(self.name)))
-        parser.add_argument(**vars(self.__required__(self.description)))
-        parser.add_argument(**vars(self.__required__(self.stock)))
-        parser.add_argument(**vars(self.__required__(self.prix)))
-        parser.add_argument(**vars(self.__required__(self.store_id)))
+        parser.add_argument(**vars(self.__required__(self.city)))
+        parser.add_argument(**vars(self.__required__(self.postcode)))
+        parser.add_argument(**vars(self.__required__(self.adress)))
 
         try:
             data = parser.parse_args()
             del parser
-
+ 
         except Exception as e:
             logging.error(e)
             abort(400, 'Missing required parameter in the JSON body')
-        
-        else:
-            product = Product(store_id=data['store_id'], name=data['name'], description=data['description'], stock=data['stock'], prix=data['prix'])
-            if not product:
-                abort(405, 'Product could not be found')
-
+          
+        else: 
+            adress = Adress(city=data['city'], postcode=data['postcode'], adress=data['adress'], user_id=user.id)
+            if not adress:
+                abort(405, 'Adress could not be found')
             try:
-                product.add_to_db()
-
+                adress.add_to_db()
 
             except Exception as e:
                 logging.error(e)
-                abort(422, 'An error occurred creating the product')
+                abort(422, 'An error occurred creating the adress')
 
-            product_json = product.json(product_avis=[]) 
-            response = current_app.response_class(response=json.dumps(product_json), status=201,
+            adress_json = adress.json()
+            response = current_app.response_class(response=json.dumps(adress_json), status=201,
                                                 mimetype='application/json')
             return response
 
 
-    def get(self):
+    @token_required
+    def get(self, user):
         """
             Get an Product
             :params:    name: name of the product to get
@@ -97,46 +94,7 @@ class ProductInStore(Resource):
             :rtype: application/json.
         """
         parser = reqparse.RequestParser()
-        parser.add_argument(**vars(self.__required__(self.name)))
-
-        try:
-            data = parser.parse_args()
-            del parser
-
-        except Exception as e:
-            logging.error(e)
-            abort(400, 'Missing required parameter in the JSON body')
-
-        else: 
-
-            product = Product.find_by_name(name=data['name'])
-            
-            if not product:
-                abort(405, 'Product could not be found')
-            
-            avis_list = Avis.find_all_by_product_id(product_id=product.id)
-            json_list_avis = Avis.all_json(avis_list)
-
-            try:
-                response = current_app.response_class(response=json.dumps(product.json(product_avis=json_list_avis)), status=200,
-                                                      mimetype='application/json')
-                return response
-
-            except Exception as e:
-                logging.error(e)
-                abort(400, 'An error occurred retrieving the product')
-
-
-    def delete(self):
-        """
-            Delete a Product
-            :params:    name: nameof the product to delete
-
-            :return: str
-            :rtype: application/json.
-        """
-        parser = reqparse.RequestParser()
-        parser.add_argument(**vars(self.__required__(self.name)))
+        parser.add_argument(**vars(self.__optional__(self.id)))
 
         try:
             data = parser.parse_args()
@@ -147,18 +105,60 @@ class ProductInStore(Resource):
             abort(400, 'Missing required parameter in the JSON body')
 
         else:
-            product = Product.find_by_name(name=data['name'])
-            if not product:
+                 
+            if data['id'] in data: 
+                adress = Adress.find_by_id(id=data['id'], user_id=user.id)
+                if not adress:
+                    abort(405, 'Adress could not be found')
+
+                json_adress = adress.json() 
+ 
+            else:
+                adress_list = Adress.find_all(user_id=user.id)
+                if not adress_list:
+                    abort(405, 'Adress list could not be found')
+
+                json_adress = Adress.all_json(adress_list=adress_list)
+ 
+        response = current_app.response_class(response=json.dumps(json_adress), status=200,
+                                                      mimetype='application/json')
+        return response
+
+
+    @token_required
+    def delete(self, user):
+        """
+            Delete a Product
+            :params:    name: nameof the product to delete 
+
+            :return: str
+            :rtype: application/json.
+        """
+        parser = reqparse.RequestParser()
+        parser.add_argument(**vars(self.__required__(self.id)))
+ 
+        try:
+            data = parser.parse_args()
+            del parser
+
+        except Exception as e:
+            logging.error(e)
+            abort(400, 'Missing required parameter in the JSON body')
+
+        else:
+            adress = Adress.find_by_id(id=data['id'], user_id=user.id)
+            if not adress:
                 abort(405, 'Product could not be found')
 
-            product.remove_from_db()
-        response = current_app.response_class(response=json.dumps(dict(message='product deleted')), status=204, mimetype='application/json')
+            adress.remove_from_db()
+        response = current_app.response_class(response=json.dumps(dict(message='adress deleted')), status=204, mimetype='application/json')
 
         return response
 
 
-    def patch(self):
-        """
+    @token_required
+    def patch(self, user):
+        """ 
             Patch a Product
             :params:    name: name of the product to patch
                         description: description of the product to patch
@@ -170,12 +170,12 @@ class ProductInStore(Resource):
             :rtype: application/json.
         """
         parser = reqparse.RequestParser()
-        parser.add_argument(**vars(self.__required__(self.name)))
-        parser.add_argument(**vars(self.__optional__(self.description)))
-        parser.add_argument(**vars(self.__optional__(self.stock)))
-        parser.add_argument(**vars(self.__optional__(self.prix)))
+        parser.add_argument(**vars(self.__required__(self.id)))
+        parser.add_argument(**vars(self.__optional__(self.city)))
+        parser.add_argument(**vars(self.__optional__(self.postcode)))
+        parser.add_argument(**vars(self.__optional__(self.adress)))
 
-        try: 
+        try:
             data = parser.parse_args()
             del parser
 
@@ -189,17 +189,16 @@ class ProductInStore(Resource):
                 if data[key] and data[key] != '': 
                     keys_to_patch[key] = data[key]
 
-            product = Product.find_by_name(name=data['name'])
-            if not product:
-                abort(404, dict(message='Product could not be found'))
-
+            adress = Adress.find_by_id(id=data['id'], user_id=user.id)
+            if not adress:
+                abort(404, dict(message='Adress could not be found'))
+ 
             try:
-                product.patch_in_db(keys_to_patch)
-                
+                adress.patch_in_db(keys_to_patch) 
             except Exception as e:
-                logging.error(e) 
+                logging.error(e)  
                 response = current_app.response_class(response=json.dumps(dict(message=keys_to_patch)), status=405, mimetype='application/json')
 
                 abort(405, 'Missing required parameter in the JSON body')
-            response = current_app.response_class(response=json.dumps(dict(message='product udpated')), status=204, mimetype='application/json')
-            return response
+            response = current_app.response_class(response=json.dumps(dict(message='adress udpated')), status=204, mimetype='application/json')
+            return response 

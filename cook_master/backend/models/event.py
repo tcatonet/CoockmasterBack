@@ -16,7 +16,7 @@ class Room(db.Model):
     postcode = db.Column(db.String(50))
     adress = db.Column(db.String(50))
 
-    event = db.relationship("Event", back_populates="room")
+    room_in_event = db.relationship('RoomInEvent', back_populates="room")
 
     def json(self):
         """
@@ -103,7 +103,7 @@ class Prestataire(db.Model):
     activite = db.Column(db.String(50))
     description = db.Column(db.String(50))
 
-    event = db.relationship("Event", back_populates="prestataire")
+    prestataire_in_event = db.relationship('PrestataireInEvent', back_populates="prestataire")
 
     def json(self):
         """
@@ -273,23 +273,21 @@ class Event(db.Model):
     name = db.Column(db.String(50), unique=True)
     description = db.Column(db.String(1000))
 
-    room_id = db.Column(db.Integer, db.ForeignKey('room.id'))
-    room = db.relationship("Room", back_populates="event")
-
-    prestataire_id = db.Column(db.Integer, db.ForeignKey('prestataire.id'))
-    prestataire = db.relationship("Prestataire", back_populates="event")
-
     categorie_id = db.Column(db.Integer, db.ForeignKey('categorie.id'))
     categorie = db.relationship("Categorie", back_populates="event")
 
-    def json(self):
+    rooms = db.relationship('RoomInEvent', back_populates="event")
+    prestataires = db.relationship('PrestataireInEvent', back_populates="event")
+
+    def json(self, json_prestataire, json_room, json_categorie):
         """
         Converts this store and all its items to JSON.
 
         :return: this store and all its items.
         :rtype: JSON.
         """
-        obj = dict(id=self.id, prestataire_id=self.prestataire_id, room_id=self.room_id, categorie_id=self.categorie_id)
+
+        obj = dict(id=self.id, prestataire=json_prestataire, room=json_room, categorie=json_categorie)
         response = jsonify(json.dumps(obj, ensure_ascii=False))
         response.headers["Content-Type"] = "application/json; charset=utf-8"
         return obj
@@ -358,3 +356,143 @@ class Event(db.Model):
         """
          
         return cls.query.filter_by().all()
+    
+
+class RoomInEvent(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    room_id = db.Column(db.Integer, db.ForeignKey('room.id'))
+    room = db.relationship("Room", back_populates="room_in_event")
+
+    event_id = db.Column(db.Integer, db.ForeignKey('event.id'))
+    event = db.relationship("Event", back_populates="rooms")
+
+    def __repr__(self):
+        return "<TableName(id='%s')>" % self.id
+
+    def json(self):
+        """
+        Converts this store and all its items to JSON.
+
+        :return: this store and all its items.
+        :rtype: JSON.
+        """
+        obj = dict(id=self.id, room_id=self.room_id, event_id=self.event_id)
+        response = jsonify(json.dumps(obj, ensure_ascii=False))
+        response.headers["Content-Type"] = "application/json; charset=utf-8"
+        return obj
+
+    def add_to_db(self):
+        """
+            Inserts this user in the DB.
+        """
+        db.session.add(self)
+        db.session.commit()
+
+    def patch_in_db(self, patch_values):
+        """
+            Update this basket in the DB.
+        """
+        num_rows_updated = self.query.filter_by(id=self.id).update(patch_values)
+        db.session.commit()
+        return num_rows_updated
+
+    def remove_from_db(self):
+        """
+            Deletes this user from the DB.
+        """
+        db.session.delete(self)
+        db.session.commit()
+
+    @classmethod
+    def find_by_id(cls, id, basket_id):
+        """
+            Selects a user from the DB and returns it.
+
+            :param _id: the id of the user.
+            :type _id: int
+            :return: a user.
+            :rtype: UserModel.
+        """
+        return cls.query.filter_by(id=id, basket_id=basket_id).first()
+
+    @classmethod
+    def get_all(cls, basket_id):
+        """
+            Selects a store from the DB and returns it.
+
+            :param name: the username of the user.
+            :type name: str
+            :return: a user.
+            :rtype: UserModel.
+        """
+        return cls.query.filter_by(basket_id=basket_id)
+
+
+class PrestataireInEvent(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    prestataire_id = db.Column(db.Integer, db.ForeignKey('prestataire.id'))
+    prestataire = db.relationship("Prestataire", back_populates="prestataire_in_event")
+    
+    event_id = db.Column(db.Integer, db.ForeignKey('event.id'))
+    event = db.relationship("Event", back_populates="prestataires")
+
+    def __repr__(self):
+        return "<TableName(id='%s')>" % self.id
+
+    def json(self):
+        """
+        Converts this store and all its items to JSON.
+
+        :return: this store and all its items.
+        :rtype: JSON.
+        """
+        obj = dict(id=self.id, prestataire_id=self.prestataire_id, event_id=self.event_id)
+        response = jsonify(json.dumps(obj, ensure_ascii=False))
+        response.headers["Content-Type"] = "application/json; charset=utf-8"
+        return obj
+
+    def add_to_db(self):
+        """
+            Inserts this user in the DB.
+        """
+        db.session.add(self)
+        db.session.commit()
+
+    def patch_in_db(self, patch_values):
+        """
+            Update this basket in the DB.
+        """
+        num_rows_updated = self.query.filter_by(id=self.id).update(patch_values)
+        db.session.commit()
+        return num_rows_updated
+
+    def remove_from_db(self):
+        """
+            Deletes this user from the DB.
+        """
+        db.session.delete(self)
+        db.session.commit()
+
+    @classmethod
+    def find_by_id(cls, id, basket_id):
+        """
+            Selects a user from the DB and returns it.
+
+            :param _id: the id of the user.
+            :type _id: int
+            :return: a user.
+            :rtype: UserModel.
+        """
+        return cls.query.filter_by(id=id, basket_id=basket_id).first()
+
+    @classmethod
+    def get_all(cls, basket_id):
+        """
+            Selects a store from the DB and returns it.
+
+            :param name: the username of the user.
+            :type name: str
+            :return: a user.
+            :rtype: UserModel.
+        """
+        return cls.query.filter_by(basket_id=basket_id)

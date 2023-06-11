@@ -147,4 +147,3 @@ class EventCatrgorie(Resource):
         response = current_app.response_class(response=json.dumps({'message':'categorie deleted'}), status=203, mimetype='application/json')
 
         return response
-
