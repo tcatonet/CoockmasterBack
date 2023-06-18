@@ -9,7 +9,8 @@ from flask_restful import Api
 from gevent import pywsgi
 from config import app
 from flask_jwt import JWT
- 
+from sqlalchemy import text
+
 from functools import partial
 from resources.map import adv_mapping
 from resources.map import app_mapping
@@ -25,8 +26,11 @@ from resources.order import UserOrder
 from resources.adress import UserAdress
 from resources.room import CompanyRoom
 from resources.prestataire import CompanyPrestataire
-from resources.categorie import EventCatrgorie
+from resources.event_categorie import EventCatrgorie
+from resources.product_categorie import StoreProductCategorie
 from resources.avis import UserAvis
+
+from models.user import User
 
 from resources.verification import app_verification, mail_resend
 from config import production, host, port, PROD_HOST, PROD_PORT, debug
@@ -37,10 +41,14 @@ from security import authenticate, identity
 
 @app.before_first_request
 def create_tables():
-    from db import db 
+    from db import db
     db.init_app(app)
     db.create_all()
- 
+
+    user = User(username='admin', email='admin@admin.fr', password='admin',
+                level=100, first_name='admin', last_name='admin', phone='0000000000')
+    user.add_to_db()
+
  
 # Adding /auth end point:
 jwt = JWT(app, authenticate, identity)
@@ -68,7 +76,7 @@ api.add_resource(UserAvis, '/user_avis')
 api.add_resource(CompanyRoom, '/company_room')
 api.add_resource(CompanyPrestataire, '/company_prestataire')
 api.add_resource(EventCatrgorie, '/event_catrgorie')
-
+api.add_resource(StoreProductCategorie, '/product_catrgorie')
  
 # we choose simply between dev and prod environment 
 if production:
@@ -92,7 +100,7 @@ if production:
     signal.signal(signal.SIGINT, signal_handler)
  
     server.serve_forever()
-    server.close()
+    server.close() 
 else: 
     logging.warning('starting development server !')
       

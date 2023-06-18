@@ -44,7 +44,8 @@ class UserBasket(Resource):
         """
             Get a basket
             :type user: User
-        
+            :params:    user_id: user_id of the basket to delet
+
             :return: basket json
             :rtype: application/json.
         """
@@ -60,7 +61,6 @@ class UserBasket(Resource):
         products = Product.get_all_from_basket(product_in_baskets= product_in_baskets)
 
         try: 
-
             basket_price=0
             for p in products:
                 basket_price+=p.prix
@@ -68,14 +68,16 @@ class UserBasket(Resource):
             keys_to_patch = dict()
             keys_to_patch['prix'] = float(basket_price)
             basket.patch_in_db(keys_to_patch)
-
             json_product_in_baskets = basket.all_json(product_in_baskets=product_in_baskets)
+
+        except ValueError as e:
+            logging.error(e)
+            abort(422, 'An error occurred getting the basket')
+
+        else:
             response = current_app.response_class(response=json.dumps(json_product_in_baskets), status=200,
                                                       mimetype='application/json')
             return response
-        
-        except ValueError:
-            abort(404, str(ValueError))
 
 
     @token_required
@@ -83,21 +85,27 @@ class UserBasket(Resource):
         """
             Delete a basket
             :type user: User
-        
+            :params:    id: id of the basket to delet
+
             :return: str
             :rtype: application/json.
         """
 
         basket = Basket.find_by_user_id(user_id=user.id)
+        
         if not basket:
             abort(405, 'Basket could not be found')
 
         try:
             product_in_baskets = ProductInBasket.get_all(basket_id= basket.id)
             Basket.delete_all_from_basket(product_in_baskets= product_in_baskets)
+
+        except ValueError as e:
+            logging.error(e)
+            abort(422, 'An error occurred deleting the basket')
+
+        else:
             response = current_app.response_class(response=json.dumps(dict(message='basket deleted')), status=200,
                                                       mimetype='application/json')
             return response 
         
-        except ValueError:
-            abort(404, str(ValueError))

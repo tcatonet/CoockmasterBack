@@ -5,13 +5,15 @@
 import json
 import copy
 import logging
+import re
 
 from argparse import Namespace
 from flask import abort, current_app
 from flask_restful import Resource, reqparse
 
 from models.event import Room
-from resources.verification import token_required
+from resources.verification import token_required, admin_token_required
+from utils.validation import valid_postcode_regex
 
 
 class CompanyRoom(Resource):
@@ -40,17 +42,15 @@ class CompanyRoom(Resource):
         return local_args_namespace
     
     
-    @token_required
+    @admin_token_required
     def post(self, user):
         """
-            Get an Product
-            :params:    name: name of the product to create
-                        description: description of the product to create
-                        stock: stock of the product to create
-                        prix: prix of the product to create
-                        store_id: store of the product to create
+            Post a room
+            :params:    city: city of the room 
+                        postcode: postcode of the room
+                        adress: adress of the room
 
-            :return: Product json data. 
+            :return: Room json data. 
             :rtype: application/json.
         """    
         parser = reqparse.RequestParser()
@@ -58,81 +58,92 @@ class CompanyRoom(Resource):
         parser.add_argument(**vars(self.__required__(self.postcode)))
         parser.add_argument(**vars(self.__required__(self.adress)))
 
-        try:
-            data = parser.parse_args()
+        try:  
+            data = parser.parse_args() 
             del parser
 
-        except Exception as e:
+        except Exception as e: 
             logging.error(e)
             abort(400, 'Missing required parameter in the JSON body')
         
         else:
+            if not re.match(valid_postcode_regex, data['postcode']):
+                abort(400, 'invalid postcode')
+            if not data['postcode']: 
+                abort(400, 'postcode cannot be empty')
+            if not data['city']:
+                abort(400, 'city cannot be empty') 
+            if not data['adress']:  
+                abort(400, 'adress cannot be empty')
 
             try:
                 room = Room(city=data['city'], postcode=data['postcode'], adress=data['adress'])
-                if not room:
-                    abort(404, dict(message='Room could not be found'))
-
                 room.add_to_db()
                 room_json = room.json()
 
             except Exception as e:
                 logging.error(e)
                 abort(422, 'An error occurred creating the room')
-
-            response = current_app.response_class(response=json.dumps(room_json), status=201,
-                                                mimetype='application/json')
-            return response
+            else:
+            
+                response = current_app.response_class(response=json.dumps(room_json), status=201,
+                                                    mimetype='application/json')
+                return response
 
 
     @token_required
     def get(self, user):
         """
-            Get an Product
-            :params:    name: name of the product to get
+            Get an room
+            :params:    id: id of the room to get
 
-            :return: Product json data.
+            :return: Room json data.
             :rtype: application/json.
         """
         parser = reqparse.RequestParser()
         parser.add_argument(**vars(self.__optional__(self.id)))
 
-        try:
+        try: 
             data = parser.parse_args()
             del parser
 
         except Exception as e:
             logging.error(e)
             abort(400, 'Missing required parameter in the JSON body')
-        
+         
         else:
-            try:
-                if data['id']: 
-                    room = Room.find_by_id(id=data['id'])
-                    if not room:
-                        abort(404, dict(message='Room could not be found'))
+            if data['id']:   
+                room = Room.find_by_id(id=data['id'])
+                if not room:
+                    abort(404, dict(message='Room could not be found'))
+
+                try:
                     json_room = room.json()
+                except Exception as e:
+                    logging.error(e) 
+                    abort(422, 'An error occurred getting the room')
+            else:  
+                room_list = Room.find_all() 
+                if not room_list:
+                    abort(404, dict(message='Room list could not be found'))
 
-                else:
-                    room_list = Room.find_all()
-                    if not room_list:
-                        abort(404, dict(message='Room list could not be found'))
+                try: 
                     json_room = Room.all_json(room_list=room_list)
+                except Exception as e:
+                    logging.error(e) 
+                    abort(422, 'An error occurred getting the room')
 
-            except Exception as e:
-                logging.error(e)
-                abort(422, 'An error occurred getting the room')
-
+            #else:
             response = current_app.response_class(response=json.dumps(json_room), status=200,
-                                                        mimetype='application/json')
+                                                            mimetype='application/json')
             return response
 
 
-    @token_required
+    @admin_token_required
     def delete(self, user):
         """
-            Delete a Product
-            :params:    name: nameof the product to delete
+            Delete a Room
+            :params:    id: id of the Room to delete
 
             :return: str
             :rtype: application/json.
@@ -149,11 +160,11 @@ class CompanyRoom(Resource):
             abort(400, 'Missing required parameter in the JSON body')
 
         else:
-            try:
-                room = Room.find_by_id(id=data['id'])
-                if not room:
-                    abort(405, 'Room could not be found')
+            room = Room.find_by_id(id=data['id'])
+            if not room:
+                abort(405, 'Room could not be found')
 
+            try:
                 room.remove_from_db()
 
             except Exception as e:
@@ -165,17 +176,16 @@ class CompanyRoom(Resource):
         return response
 
 
-    @token_required
+    @admin_token_required
     def patch(self, user):
         """
-            Patch a Product
-            :params:    name: name of the product to patch
-                        description: description of the product to patch
-                        stock: stock of the product to patch
-                        prix: prix of the product to patch
-                        store_id: store of the product to patch
+            Patch a Room
+            :params:    id: id of the Room to patch
+                        city: city of the Room to patch
+                        postcode: postcode of the Room to patch
+                        adress: adress of the Room to patch
 
-            :return: Product json data 
+            :return: Room json data 
             :rtype: application/json.
         """
         parser = reqparse.RequestParser()
@@ -193,6 +203,9 @@ class CompanyRoom(Resource):
             abort(400, dict(message='Missing required parameter in the JSON body'))
 
         else:
+            if not re.match(valid_postcode_regex, data['postcode']):
+                abort(400, 'invalid postcode')
+
             keys_to_patch = dict()
             for key in data.keys():
                 if data[key] and data[key] != '': 
@@ -206,7 +219,7 @@ class CompanyRoom(Resource):
                 room.patch_in_db(keys_to_patch)
             except Exception as e:
                 logging.error(e) 
-                abort(405, 'An error occurred patching the room')
+                abort(422, 'An error occurred patching the room')
 
             response = current_app.response_class(response=json.dumps(dict(message='room udpated')), status=204, mimetype='application/json')
             return response

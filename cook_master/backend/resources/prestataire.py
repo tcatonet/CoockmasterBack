@@ -11,7 +11,7 @@ from flask import abort, current_app
 from flask_restful import Resource, reqparse
 
 from models.event import Prestataire
-from resources.verification import token_required
+from resources.verification import token_required, admin_token_required
 
 
 class CompanyPrestataire(Resource):
@@ -19,8 +19,8 @@ class CompanyPrestataire(Resource):
     """ Product endpoint. """
 
     id = Namespace(name='id', default=0, dest="id", action='store', type=int)
-    nom = Namespace(name='nom', default=0, dest="nom", action='store', type=str)
-    prenom = Namespace(name='prenom', default=0, dest="prenom", action='store', type=str)
+    lastname = Namespace(name='lastname', default=0, dest="lastname", action='store', type=str)
+    firstname = Namespace(name='firstname', default=0, dest="firstname", action='store', type=str)
     activite = Namespace(name='activite', default=0, dest="activite", action='store', type=str)
     description = Namespace(name='description', default=0, dest="description", action='store', type=str)
 
@@ -41,22 +41,21 @@ class CompanyPrestataire(Resource):
         return local_args_namespace
     
     
-    @token_required
+    @admin_token_required
     def post(self, user):
         """
-            Get an Product
-            :params:    name: name of the product to create
-                        description: description of the product to create
-                        stock: stock of the product to create
-                        prix: prix of the product to create
-                        store_id: store of the product to create
+            Get an Prestataire
+            :params:    lastname: lastname of the Prestataire to create
+                        firstname: firstname of the Prestataire to create
+                        activite: activite of the Prestataire to create
+                        description: description of the Prestataire to create
 
-            :return: Product json data. 
+            :return: Prestataire json data.  
             :rtype: application/json.
         """    
         parser = reqparse.RequestParser()
-        parser.add_argument(**vars(self.__required__(self.nom)))
-        parser.add_argument(**vars(self.__required__(self.prenom)))
+        parser.add_argument(**vars(self.__required__(self.lastname)))
+        parser.add_argument(**vars(self.__required__(self.firstname)))
         parser.add_argument(**vars(self.__required__(self.activite)))
         parser.add_argument(**vars(self.__required__(self.description)))
 
@@ -69,28 +68,38 @@ class CompanyPrestataire(Resource):
             abort(400, 'Missing required parameter in the JSON body')
         
         else:
-            prestataire = Prestataire(nom=data['nom'], prenom=data['prenom'], activite=data['activite'], description=data['description'])
+            if data['firstname'] == '':
+                abort(400, 'invalid firstname')
+            if data['lastname'] == '':
+                abort(400, 'invalid lastname')
+            if data['description'] == '':
+                abort(400, 'invalid description')
+            if data['activite'] == '':
+                abort(400, 'invalid activite')
+
+            prestataire = Prestataire(lastname=data['lastname'], firstname=data['firstname'], activite=data['activite'], description=data['description'])
             if not prestataire:
                 abort(405, 'Prestataire could not be found')
 
             try:
                 prestataire.add_to_db()
+                prestataire_json = prestataire.json()
 
             except Exception as e:
                 logging.error(e)
-                abort(422, 'An error occurred creating the room')
+                abort(422, 'An error occurred creating the Prestataire')
 
-            prestataire_json = prestataire.json()
-            response = current_app.response_class(response=json.dumps(prestataire_json), status=201,
-                                                mimetype='application/json')
-            return response
+            else:
+                response = current_app.response_class(response=json.dumps(prestataire_json), status=201,
+                                                    mimetype='application/json')
+                return response
 
 
     @token_required
     def get(self, user):
         """
-            Get an Product
-            :params:    name: name of the product to get
+            Get an Prestataire
+            :params:    id: id of the Prestataire to get
 
             :return: Product json data.
             :rtype: application/json.
@@ -102,7 +111,6 @@ class CompanyPrestataire(Resource):
         del parser
 
         if data['id']: 
-
             prestataire = Prestataire.find_by_id(id=data['id'])
             if not prestataire:
                 abort(405, 'Prestataire could not be found')
@@ -121,11 +129,11 @@ class CompanyPrestataire(Resource):
         return response
 
 
-    @token_required
+    @admin_token_required
     def delete(self, user):
         """
-            Delete a Product
-            :params:    name: nameof the product to delete
+            Delete a prestataire
+            :params:    id: id of the prestataire to delete
 
             :return: str
             :rtype: application/json.
@@ -141,22 +149,28 @@ class CompanyPrestataire(Resource):
             logging.error(e)
             abort(400, 'Missing required parameter in the JSON body')
 
-        else:
-            prestataire = Prestataire.find_by_id(id=data['id'])
+        else: 
+            prestataire = Prestataire.find_by_id(id=data['id']) 
             if not prestataire:
                 abort(405, 'Prestataire could not be found')
 
-            prestataire.remove_from_db()
-        response = current_app.response_class(response=json.dumps(dict(message='prestataire deleted')), status=204, mimetype='application/json')
+            try:
+                prestataire.remove_from_db()
 
-        return response
+            except Exception as e:
+                logging.error(e)
+                abort(422, 'An error occurred deleting the prestataire')
+
+            else:
+                response = current_app.response_class(response=json.dumps(dict(message='prestataire deleted')), status=204, mimetype='application/json')
+                return response
 
 
-    @token_required
+    @admin_token_required
     def patch(self, user):
         """
             Patch a Product
-            :params:    name: name of the product to patch
+            :params:    lastname: lastname of the product to patch
                         description: description of the product to patch
                         stock: stock of the product to patch
                         prix: prix of the product to patch
@@ -167,8 +181,8 @@ class CompanyPrestataire(Resource):
         """
         parser = reqparse.RequestParser()
         parser.add_argument(**vars(self.__required__(self.id)))
-        parser.add_argument(**vars(self.__optional__(self.nom)))
-        parser.add_argument(**vars(self.__optional__(self.prenom)))
+        parser.add_argument(**vars(self.__optional__(self.lastname)))
+        parser.add_argument(**vars(self.__optional__(self.firstname)))
         parser.add_argument(**vars(self.__optional__(self.activite)))
         parser.add_argument(**vars(self.__optional__(self.description)))
 
@@ -196,7 +210,8 @@ class CompanyPrestataire(Resource):
             except Exception as e:
                 logging.error(e) 
                 response = current_app.response_class(response=json.dumps(dict(message=keys_to_patch)), status=405, mimetype='application/json')
+                abort(422, 'An error occurred patching the prestataire')
 
-                abort(405, 'Missing required parameter in the JSON body')
-            response = current_app.response_class(response=json.dumps(dict(message='prestataire udpated')), status=204, mimetype='application/json')
-            return response
+            else:
+                response = current_app.response_class(response=json.dumps(dict(message='prestataire udpated')), status=204, mimetype='application/json')
+                return response

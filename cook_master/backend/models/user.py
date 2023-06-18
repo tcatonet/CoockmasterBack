@@ -23,7 +23,7 @@ class User(db.Model):
     adress = db.relationship('Adress', back_populates='user')
     avis = db.relationship('Avis', back_populates='user')
 
-    user_level = db.Column(db.Integer)
+    level = db.Column(db.Integer)
     code = db.Column(db.Integer)
     username = db.Column(db.String(80))
     password = db.Column(db.String(256))

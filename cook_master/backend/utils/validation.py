@@ -2,7 +2,7 @@ from flask_mail import Message
 from flask import current_app
 valid_email_regex = r"[^@]+@[^@]+\.[^@]+"
 valid_phone_regex = '^(33|0)(6|7|9)\d{8}$'
-
+valid_postcode_regex = r"[0-9]{5}" 
 
 def send_confirmation_mail(new_user_email, code):
     confirmation_email = Message('Thanks you for joining in !', sender=current_app.config['MAIL_USERNAME'], recipients=[new_user_email])

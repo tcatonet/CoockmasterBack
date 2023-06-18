@@ -54,7 +54,7 @@ class UserRegister(Resource):
     
 
     @token_required
-    def get(self, user):
+    def get(self, user): 
         """
             Find an user by email
 
@@ -65,25 +65,15 @@ class UserRegister(Resource):
             :return: user data.
             :rtype: application/json.
         """
-        parser = reqparse.RequestParser()
-        parser.add_argument(**vars(self.__optional__(self.email)))
 
-        try:
-            data = parser.parse_args()
-            del parser
 
-        except Exception as e:
-            logging.error(e)
-            abort(400, 'Missing required parameter in the JSON body')
-        
-        else:
-
-            user = User.find_by_email(email=user.email)
-            if user:
-                response = current_app.response_class(response=json.dumps(user.json()), status=200,
+        user = User.find_by_email(email=user.email)
+        if user:
+            response = current_app.response_class(response=json.dumps(user.json()), status=200,
                                                       mimetype='application/json')
-                return response
-            
+            return response
+        
+        else:    
             abort(404, 'user not found')
 
  
@@ -134,13 +124,12 @@ class UserRegister(Resource):
 
             user = User(username=data['username'], email=data['email'], password=data['password'],
                         level=0, first_name=data['firstname'], last_name=data['lastname'], phone=data['phone'])
-
-            try:
+ 
+            try: 
                 user.add_to_db()
             except Exception as e:
                 logging.error(e)
                 abort(422, 'An error occurred registering the user')
-
 
             try:
                 basket_user = Basket(user_id=user.id) 
@@ -153,18 +142,14 @@ class UserRegister(Resource):
             refresh_token = {
                 'refresh_token': jwt.encode({'public_id': user.id, 'exp': datetime.utcnow() + timedelta(minutes=30)}, current_app.config['SECRET_KEY'])
                 }
-    
             refresh_token = jwt.encode({'public_id': user.id, 'exp': datetime.utcnow() + timedelta(minutes=30)}, current_app.config['SECRET_KEY'])
-            
             user_json = user.json() 
             user_json['refresh_token'] = refresh_token.decode("utf-8") 
-
             response = current_app.response_class(response=json.dumps(user_json), status=201,
                                                 mimetype='application/json')
-
             code = random.randint(10000,99999)
-
             msg = send_confirmation_mail(user.email, code)
+
             try:
                 mail.send(msg)
                 keys_to_patch = dict()
@@ -189,19 +174,26 @@ class UserRegister(Resource):
         :return: success or failure.
         :rtype: application/json response.
         """ 
-        user.remove_from_db()
 
-        response = current_app.response_class(response=json.dumps(dict(message='user deleted')), status=204, mimetype='application/json')
-        msg = send_delete_account_mail(user.email, request.url_root, user.verified)
-        
         try:
-            mail.send(msg)
-        except ConnectionRefusedError as e:
-            current_app.logger.warning('Could not send delete account email')
-            current_app.logger.warning(e)
-        except ssl.SSLError as e:
-            current_app.logger.warning(e)
-        return response
+            user.remove_from_db()
+
+        except Exception as e:
+            logging.error(e)
+            abort(422, 'An error occurred deleting the product')
+
+        else:
+            response = current_app.response_class(response=json.dumps(dict(message='user deleted')), status=204, mimetype='application/json')
+            msg = send_delete_account_mail(user.email, request.url_root, user.verified)
+            
+            try:
+                mail.send(msg)
+            except ConnectionRefusedError as e:
+                current_app.logger.warning('Could not send delete account email')
+                current_app.logger.warning(e)
+            except ssl.SSLError as e:
+                current_app.logger.warning(e)
+            return response
 
 
     @token_required 
@@ -272,14 +264,17 @@ class UserRegister(Resource):
                     keys_to_patch[key] = data[key]
 
             user = User.find_by_email(email=user.email)
+
             if not user:
                 abort(404, dict(message='User could not be found'))
+
             try:
                 user.patch_in_db(keys_to_patch)
+
             except Exception as e:
                 logging.error(e)
-                response = current_app.response_class(response=json.dumps(dict(message=keys_to_patch)), status=405, mimetype='application/json')
+                abort(422, 'An error occurred deleting the product')
 
-                abort(405, 'Missing required parameter in the JSON body')
-            response = current_app.response_class(response=json.dumps(dict(message='user udpated')), status=204, mimetype='application/json')
-            return response
+            else:
+                response = current_app.response_class(response=json.dumps(dict(message='user udpated')), status=204, mimetype='application/json')
+                return response

@@ -15,7 +15,7 @@ from models.user import User
 
 app_verification = Blueprint('verication', __name__)
 mail_resend = Blueprint('resend', __name__)
-
+ADMIN=100
  
 @app_verification.route("/verification/<token>")
 def verification(token=''):
@@ -78,6 +78,31 @@ def token_required(f):
             abort(401, 'invalid token')
        except:
             abort(401, 'invalid token') 
+
+       return f(user=user, *args, **kwargs)
+   return decorator
+
+
+def admin_token_required(f): 
+   @wraps(f)
+   def decorator(*args, **kwargs): 
+       token = None 
+       if 'x-access-tokens' in request.headers:  
+           token = request.headers['x-access-tokens']
+  
+       if not token:
+            abort(405, 'missing token')
+
+       try: 
+            data = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=["HS256"])
+            user = User.query.filter_by(id=data['public_id']).first()
+            if not user:
+                abort(401, 'invalid token')
+
+            if user.level != ADMIN:
+                abort(403, 'Forbidden action')            
+       except:
+            abort(401, 'invalid token '+ str(user.level)+" "+ str(user.email)) 
 
        return f(user=user, *args, **kwargs)
    return decorator

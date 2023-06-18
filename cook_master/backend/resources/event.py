@@ -72,32 +72,47 @@ class UserEvent(Resource):
             abort(400, 'Missing required parameter in the JSON body')
         
         else:
-
             if 'room_id' not in data:
                 data['room_id']=-1
-
             if 'prestataire_id' not in data:
                 data['prestataire_id']=-1
+            if data['name'] == '':
+                abort(400, 'invalid name')
+            if data['description'] == '':
+                abort(400, 'invalid description')
+
+            if data['room_id']:
+                room = Room.find_by_id(id=data['room_id'])
+                if not room:
+                    abort(405, 'Room could not be found')
+
+            if data['prestataire_id']:
+                prestataire = Prestataire.find_by_id(id=data['prestataire_id'])
+                if not prestataire:
+                    abort(405, 'Prestataire could not be found')
+
+            categorie = Categorie.find_by_id(id=data['categorie_id'])
+            if not categorie:
+                abort(405, 'Categorie could not be found')
 
             event = Event(name=data['name'], 
                           description=data['description'], 
-                          categorie_id=data['categorie_id'], 
-                          room_id=data['room_id'], 
-                          prestataire_id=data['prestataire_id'])
-            if not event:
-                abort(405, 'Event could not be found')
+                          categorie_id=categorie.id, 
+                          room_id=room.id, 
+                          prestataire_id=prestataire.id)
 
             try:
                 event.add_to_db()
+                event_json = event.json() 
 
             except Exception as e:
                 logging.error(e)
                 abort(422, 'An error occurred creating the event')
 
-            event_json = event.json() 
-            response = current_app.response_class(response=json.dumps(event_json), status=201,
-                                                mimetype='application/json')
-            return response
+            else:
+                response = current_app.response_class(response=json.dumps(event_json), status=201,
+                                                    mimetype='application/json')
+                return response
 
 
     def get(self):
@@ -119,8 +134,7 @@ class UserEvent(Resource):
             logging.error(e)
             abort(400, 'Missing required parameter in the JSON body')
 
-        else: 
-
+        else:
             if data['id']:
                 event = Event.find_by_id(id=data['id'])
 
@@ -142,14 +156,9 @@ class UserEvent(Resource):
             if not event:
                 abort(405, 'Event could not be found')
             
-            try:
-                response = current_app.response_class(response=json.dumps(json_event), status=200,
+            response = current_app.response_class(response=json.dumps(json_event), status=200,
                                                       mimetype='application/json')
-                return response
-
-            except Exception as e:
-                logging.error(e)
-                abort(400, 'An error occurred retrieving the event')
+            return response 
 
 
     def delete(self):
@@ -157,7 +166,7 @@ class UserEvent(Resource):
             Delete a Product
             :params:    name: nameof the product to delete
 
-            :return: str
+            :return: str 
             :rtype: application/json.
         """
         parser = reqparse.RequestParser()
@@ -168,7 +177,7 @@ class UserEvent(Resource):
             del parser
 
         except Exception as e:
-            logging.error(e)
+            logging.error(e) 
             abort(400, 'Missing required parameter in the JSON body')
 
         else:
@@ -176,11 +185,16 @@ class UserEvent(Resource):
             if not event:
                 abort(405, 'Event could not be found')
 
-            event.remove_from_db()
+            try:
+                event.remove_from_db()
 
-        response = current_app.response_class(response=json.dumps(dict(message='event deleted')), status=204, mimetype='application/json')
+            except:
+                logging.error(e)
+                abort(422, 'An error occurred deleting the event')
+            else:
+                response = current_app.response_class(response=json.dumps(dict(message='event deleted')), status=204, mimetype='application/json')
 
-        return response
+                return response
 
 
     def patch(self):
@@ -201,8 +215,9 @@ class UserEvent(Resource):
         parser.add_argument(**vars(self.__optional__(self.description)))
         parser.add_argument(**vars(self.__optional__(self.prestataire_id)))
         parser.add_argument(**vars(self.__optional__(self.room_id)))
+        parser.add_argument(**vars(self.__optional__(self.categorie_id)))
 
-        try: 
+        try:
             data = parser.parse_args()
             del parser
 
@@ -211,6 +226,21 @@ class UserEvent(Resource):
             abort(400, dict(message='Missing required parameter in the JSON body'))
 
         else:
+            if data['room_id']:
+                room = Room.find_by_id(id=data['room_id'])
+                if not room:
+                    abort(405, 'Room could not be found')
+
+            if data['prestataire_id']:
+                prestataire = Prestataire.find_by_id(id=data['prestataire_id'])
+                if not prestataire:
+                    abort(405, 'Prestataire could not be found')
+
+            if data['categorie_id']:
+                categorie = Categorie.find_by_id(id=data['categorie_id'])
+                if not categorie:
+                    abort(405, 'Categorie could not be found')
+
             keys_to_patch = dict()
             for key in data.keys():
                 if data[key] and data[key] != '': 
@@ -219,13 +249,14 @@ class UserEvent(Resource):
             event = Event.find_by_id(id=data['id'])
             if not event:
                 abort(404, dict(message='Event could not be found'))
-
+ 
             try:
                 event.patch_in_db(keys_to_patch)
-                
+                 
             except Exception as e:
-                logging.error(e) 
+                logging.error(e)  
                 abort(405, dict(message='Cannot update vent'))
-
-            response = current_app.response_class(response=json.dumps(dict(message='event udpated')), status=204, mimetype='application/json')
-            return response
+                
+            else:
+                response = current_app.response_class(response=json.dumps(dict(message='event udpated')), status=204, mimetype='application/json')
+                return response

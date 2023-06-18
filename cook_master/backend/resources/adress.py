@@ -44,16 +44,14 @@ class UserAdress(Resource):
     @token_required
     def post(self, user):
         """
-            Get an Product
-            :params:    name: name of the product to create
-                        description: description of the product to create
-                        stock: stock of the product to create
-                        prix: prix of the product to create
-                        store_id: store of the product to create
+            Get an Adress
+            :params:    city: city of the Adress to create
+                        postcode: postcode of the Adress to create
+                        adress: adress of the Adress to create
 
-            :return: Product json data. 
+            :return: Adress json data. 
             :rtype: application/json.
-        """    
+        """
         parser = reqparse.RequestParser()
         parser.add_argument(**vars(self.__required__(self.city)))
         parser.add_argument(**vars(self.__required__(self.postcode)))
@@ -70,27 +68,28 @@ class UserAdress(Resource):
         else: 
             adress = Adress(city=data['city'], postcode=data['postcode'], adress=data['adress'], user_id=user.id)
             if not adress:
-                abort(405, 'Adress could not be found')
+                abort(404, 'Adress could not be found')
             try:
                 adress.add_to_db()
+                adress_json = adress.json()
 
             except Exception as e:
                 logging.error(e)
                 abort(422, 'An error occurred creating the adress')
 
-            adress_json = adress.json()
-            response = current_app.response_class(response=json.dumps(adress_json), status=201,
-                                                mimetype='application/json')
-            return response
+            else:
+                response = current_app.response_class(response=json.dumps(adress_json), status=201,
+                                                    mimetype='application/json')
+                return response
 
 
     @token_required
     def get(self, user):
         """
-            Get an Product
-            :params:    name: name of the product to get
+            Get an Adress
+            :params:    id: id of the Adress to get
 
-            :return: Product json data.
+            :return: Adress json data.
             :rtype: application/json.
         """
         parser = reqparse.RequestParser()
@@ -128,8 +127,8 @@ class UserAdress(Resource):
     @token_required
     def delete(self, user):
         """
-            Delete a Product
-            :params:    name: nameof the product to delete 
+            Delete a Adress
+            :params:    id: id the Adress to delete 
 
             :return: str
             :rtype: application/json.
@@ -151,22 +150,21 @@ class UserAdress(Resource):
                 abort(405, 'Product could not be found')
 
             adress.remove_from_db()
-        response = current_app.response_class(response=json.dumps(dict(message='adress deleted')), status=204, mimetype='application/json')
 
+        response = current_app.response_class(response=json.dumps(dict(message='adress deleted')), status=204, mimetype='application/json')
         return response
 
 
     @token_required
     def patch(self, user):
         """ 
-            Patch a Product
-            :params:    name: name of the product to patch
-                        description: description of the product to patch
-                        stock: stock of the product to patch
-                        prix: prix of the product to patch
-                        store_id: store of the product to patch
+            Patch a Adress
+            :params:    id: id of the Adress to patch
+                        city: city of the Adress to patch
+                        postcode: postcode of the Adress to patch
+                        adress: adress of the Adress to patch
 
-            :return: Product json data 
+            :return: Adress json data 
             :rtype: application/json.
         """
         parser = reqparse.RequestParser()
@@ -194,11 +192,12 @@ class UserAdress(Resource):
                 abort(404, dict(message='Adress could not be found'))
  
             try:
-                adress.patch_in_db(keys_to_patch) 
+                adress.patch_in_db(keys_to_patch)
+
             except Exception as e:
                 logging.error(e)  
-                response = current_app.response_class(response=json.dumps(dict(message=keys_to_patch)), status=405, mimetype='application/json')
-
                 abort(405, 'Missing required parameter in the JSON body')
-            response = current_app.response_class(response=json.dumps(dict(message='adress udpated')), status=204, mimetype='application/json')
-            return response 
+
+            else:
+                response = current_app.response_class(response=json.dumps(dict(message='adress udpated')), status=204, mimetype='application/json')
+                return response 

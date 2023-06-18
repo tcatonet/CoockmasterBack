@@ -98,8 +98,8 @@ class Room(db.Model):
 
 class Prestataire(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    nom = db.Column(db.String(50))
-    prenom = db.Column(db.String(50))
+    lastname = db.Column(db.String(50))
+    firstname = db.Column(db.String(50))
     activite = db.Column(db.String(50))
     description = db.Column(db.String(50))
 
@@ -112,7 +112,7 @@ class Prestataire(db.Model):
         :return: this store and all its items.
         :rtype: JSON.
         """
-        obj = dict(id=self.id, nom=self.nom, prenom=self.prenom, activite=self.activite, description=self.description)
+        obj = dict(id=self.id, lastname=self.lastname, firstname=self.firstname, activite=self.activite, description=self.description)
         response = jsonify(json.dumps(obj, ensure_ascii=False))
         response.headers["Content-Type"] = "application/json; charset=utf-8"
         return obj
@@ -126,7 +126,7 @@ class Prestataire(db.Model):
         """
         json_prestataire = []
         for prestataire in prestataire_list:
-            obj = dict(id=prestataire.id, nom=prestataire.nom, prenom=prestataire.prenom, activite=prestataire.activite, description=prestataire.description)
+            obj = dict(id=prestataire.id, lastname=prestataire.lastname, firstname=prestataire.firstname, activite=prestataire.activite, description=prestataire.description)
             json_prestataire.append(obj)
 
         response = jsonify(json.dumps(json_prestataire, ensure_ascii=False))

@@ -19,16 +19,22 @@ class Product(db.Model):
 
     store_id = db.Column(db.Integer, db.ForeignKey('store.id'))
     store = db.relationship("Store", back_populates="products")
+
+    product_categorie_id = db.Column(db.Integer, db.ForeignKey('product_categorie.id'))
+    product_categorie = db.relationship("ProductCategorie", back_populates="products")
+
     product_in_baskets = db.relationship('ProductInBasket', back_populates="product")
     products_in_order = db.relationship('ProductInOrder', back_populates="product")
     avis = db.relationship('Avis', back_populates="product")
+    date_creation = db.Column(db.DateTime, default=datetime.utcnow())
 
-    def __init__(self, store_id, name, description, stock, prix):
+    def __init__(self, store_id, name, description, stock, prix, product_categorie_id):
         self.store_id = store_id
         self.name = name
         self.description = description
         self.stock = stock
         self.prix = prix
+        self.product_categorie_id = product_categorie_id
 
     def __repr__(self): 
         return "<TableName(id='%s')>" % self.id 
@@ -40,7 +46,7 @@ class Product(db.Model):
         :return: this store and all its items.
         :rtype: JSON.
         """
-        obj = dict(store_id=self.store_id, id=self.id, name=self.name, note=self.note, description=self.description, stock=self.stock, prix=self.prix, product_avis=product_avis)
+        obj = dict(store_id=self.store_id, product_categorie_id=self.product_categorie_id, id=self.id, name=self.name, note=self.note, description=self.description, stock=self.stock, prix=self.prix, product_avis=product_avis)
         response = jsonify(json.dumps(obj, ensure_ascii=False))
         response.headers["Content-Type"] = "application/json; charset=utf-8"
         return obj
@@ -105,6 +111,111 @@ class Product(db.Model):
         return cls.query.filter_by(store_id=store_id)
 
 
+    @classmethod
+    def find_by_categorie_id(cls, store_id, product_categorie_id):
+        """
+            Selects a user from the DB and returns it.
+
+            :param _email: the username of the user.
+            :type _email: str
+            :return: a user.
+            :rtype: UserModel.
+        """
+
+        return cls.query.filter_by(store_id=store_id, product_categorie_id=product_categorie_id)
+
+
+    @classmethod
+    def find_by_note_min(cls, store_id, note):
+        """
+            Selects a user from the DB and returns it.
+
+            :param _email: the username of the user.
+            :type _email: str
+            :return: a user.
+            :rtype: UserModel.
+        """ 
+        return cls.query.filter(store_id=store_id).filter(note>note)
+
+    @classmethod
+    def find_by_note_min_max_price(cls, store_id, min_price, max_price):
+        """
+            Selects a user from the DB and returns it.
+
+            :param _email: the username of the user.
+            :type _email: str
+            :return: a user.
+            :rtype: UserModel.
+        """
+        return cls.query.filter_by(store_id=store_id).filter(Product.prix>=min_price).filter(Product.prix<=max_price)
+
+    @classmethod
+    def find_by_note_min_price(cls, store_id, min_price):
+        """
+            Selects a user from the DB and returns it. 
+
+            :param _email: the username of the user.
+            :type _email: str
+            :return: a user. 
+            :rtype: UserModel.
+        """
+        return cls.query.filter_by(store_id=store_id).filter(Product.prix>=min_price)
+    
+    @classmethod 
+    def find_by_note_max_price(cls, store_id, max_price):
+        """
+            Selects a user from the DB and returns it.
+
+            :param _email: the username of the user.
+            :type _email: str
+            :return: a user.
+            :rtype: UserModel.
+        """
+        return cls.query.filter_by(store_id=store_id).filter(Product.prix<=max_price)
+    
+    @classmethod
+    def find_by_product_categorie_id(cls, store_id, product_categorie_id, min_price, max_price, min_note):
+        """
+            Selects a user from the DB and returns it.
+
+            :param _email: the username of the user.
+            :type _email: str
+            :return: a user.
+            :rtype: UserModel.
+        """
+
+        request = cls.query.filter_by(store_id=store_id)
+
+        if product_categorie_id:
+            request=request.filter(Product.product_categorie_id==product_categorie_id).order_by(Product.date_creation.desc())
+
+ 
+        if min_price:  
+            request=request.filter(Product.prix>=min_price).order_by(Product.prix.asc())
+
+        if max_price:
+            request=request.filter(Product.prix<=max_price).order_by(Product.prix.asc())
+            
+        if min_note:
+            request=request.filter(Product.note>=min_note).order_by(Product.note.desc())
+
+        return request
+
+
+    @classmethod
+    def find_by_product_by_filter(cls, product_categorie_id):
+        """
+            Selects a user from the DB and returns it.
+
+            :param _email: the username of the user.
+            :type _email: str
+            :return: a user.
+            :rtype: UserModel.
+        """
+
+        return cls.query.filter_by(product_categorie_id=product_categorie_id)
+
+
     def remove_from_db(self):
         """
             Deletes this user from the DB.
@@ -123,9 +234,118 @@ class Product(db.Model):
             :return: a user.
             :rtype: UserModel.
         """
-        
         return cls.query.filter_by(id=_id).first()
 
+
+class ProductCategorie(db.Model):
+    __tablename__ = 'product_categorie'
+
+    id = db.Column(db.Integer, primary_key=True, unique=True)
+    name = db.Column(db.String(50), unique=True)
+    products = db.relationship('Product', back_populates='product_categorie')
+
+    def __init__(self, name):
+        self.name = name
+
+    def __repr__(self):
+        return "<TableName(id='%s')>" % self.id 
+
+    def json(self):
+        """
+        Converts this store and all its items to JSON.
+
+        :return: this store and all its items.
+        :rtype: JSON.
+        """
+        obj = dict(id=self.id, name=self.name)
+        response = jsonify(json.dumps(obj, ensure_ascii=False))
+        response.headers["Content-Type"] = "application/json; charset=utf-8"
+        return obj
+
+
+    def add_to_db(self):
+        """
+            Inserts this user in the DB.
+        """
+        db.session.add(self)
+        db.session.commit()
+
+    def patch_in_db(self, patch_values):
+        """
+            Update this basket in the DB.
+        """
+        num_rows_updated = self.query.filter_by(id=self.id).update(patch_values)
+        db.session.commit()
+        return num_rows_updated
+    
+
+    def all_json(self, products):
+        """
+        Converts this store and all its items to JSON.
+
+        :return: this store and all its items.
+        :rtype: JSON.
+        """
+
+        products_list = {'products': []}
+
+        for product in products:
+
+            obj = dict(id=product.id, name=product.name, description=product.description, stock=product.stock, prix=product.prix)
+            products_list['products'].append(obj)
+        return products_list
+
+    @classmethod
+    def find_by_name(cls, name):
+        """
+            Selects a store from the DB and returns it.
+
+            :param name: the username of the user.
+            :type name: str
+            :return: a user.
+            :rtype: UserModel.
+        """
+
+        return cls.query.filter_by(name=name).first()
+    
+    def all_json(product_categorie_list): 
+        """ 
+        Converts this store and all its items to JSON.
+
+        :return: this store and all its items.
+        :rtype: JSON.
+        """
+        json_product_categorie = []
+        for product_categorie in product_categorie_list:
+            obj = dict(id=product_categorie.id, name=product_categorie.name)
+            json_product_categorie.append(obj)
+
+        response = jsonify(json.dumps(json_product_categorie, ensure_ascii=False))
+        response.headers["Content-Type"] = "application/json; charset=utf-8"
+        return json_product_categorie
+    
+    @classmethod
+    def find_by_id(cls, id):
+        """
+            Selects a user from the DB and returns it.
+
+            :param _id: the id of the user.
+            :type _id: int
+            :return: a user.
+            :rtype: UserModel.
+        """
+        
+        return cls.query.filter_by(id=id).first()
+    
+    @classmethod
+    def get_all(cls):
+        """
+        Converts this store and all its items to JSON.
+
+        :return: this store and all its items.
+        :rtype: JSON.
+        """
+        return cls.query.filter_by().all()
 
 
 class ProductInBasket(db.Model):
@@ -437,7 +657,7 @@ class Basket(db.Model):
         db.session.commit()
 
 
-class Store(db.Model):
+class Store(db.Model): 
     __tablename__ = 'store'
 
     id = db.Column(db.Integer, primary_key=True, unique=True)
@@ -491,7 +711,7 @@ class Store(db.Model):
 
         for product in products:
 
-            obj = dict(id=product.id, name=product.name, description=product.description, stock=product.stock, prix=product.prix)
+            obj = dict(id=product.id, product_categorie_id=product.product_categorie_id,  note=product.note, name=product.name, description=product.description, stock=product.stock, prix=product.prix)
             products_list['products'].append(obj)
         return products_list
 
@@ -507,6 +727,21 @@ class Store(db.Model):
         """
 
         return cls.query.filter_by(name=name).first()
+    
+
+    @classmethod
+    def find_by_id(cls, id):
+        """
+            Selects a store from the DB and returns it.
+
+            :param name: the username of the user.
+            :type name: str
+            :return: a user.
+            :rtype: UserModel.
+        """
+
+        return cls.query.filter_by(id=id).first()
+
 
 
 class Adress(db.Model):
@@ -607,7 +842,7 @@ class Order(db.Model):
     products_in_order = db.relationship('ProductInOrder', back_populates="order")
     status = db.Column(db.String(50), unique=True)
     invoice = db.Column(db.String(50), unique=True)
-    
+    date_creation = db.Column(db.DateTime, default=datetime.utcnow())
 
     def add_to_db(self):
         """
@@ -656,13 +891,13 @@ class Order(db.Model):
         """
             Selects a user from the DB and returns it.
 
-            :param _id: the id of the user.  
-            :type _id: int
+            :param _id: the id of the user.   
+            :type _id: int 
             :return: a user.
             :rtype: UserModel. 
         """
         
-        return cls.query.filter_by(user_id=user_id).all()
+        return cls.query.filter_by(user_id=user_id).order_by(Order.date_creation.desc()).all()
 
  
     @classmethod

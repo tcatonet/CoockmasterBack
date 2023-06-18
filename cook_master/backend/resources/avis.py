@@ -44,14 +44,13 @@ class UserAvis(Resource):
     @token_required
     def post(self, user):
         """
-            Get an Product
-            :params:    name: name of the product to create
-                        description: description of the product to create
-                        stock: stock of the product to create
-                        prix: prix of the product to create
-                        store_id: store of the product to create
+            Get an Avis
+            :params:    product_in_order_id: product_in_order_id of the avis to create
+                        product_id: product_id of the avis to create
+                        comentary: comentary of the avis to create
+                        note: note of the avis to create
 
-            :return: Product json data. 
+            :return: Avis json data. 
             :rtype: application/json.
         """
         parser = reqparse.RequestParser()
@@ -59,6 +58,7 @@ class UserAvis(Resource):
         parser.add_argument(**vars(self.__required__(self.product_id)))
         parser.add_argument(**vars(self.__required__(self.comentary)))
         parser.add_argument(**vars(self.__required__(self.note)))
+
         try:
             data = parser.parse_args()
             del parser
@@ -68,9 +68,12 @@ class UserAvis(Resource):
             abort(400, 'Missing required parameter in the JSON body')
         
         else:
-
             if data['note'] > 10 or data['note'] < 0:
                 abort(400, 'Rate out of range')
+
+            product = Product.find_by_id(_id=data['product_id'])
+            if not product:
+                abort(404, dict(message='Avis could not be found'))
 
             avis = Avis.find_by_order_and_product(product_in_order_id=data['product_in_order_id'], product_id=data['product_id'])
             if avis:
@@ -87,14 +90,11 @@ class UserAvis(Resource):
                 abort(405, 'Avis could not be found')
 
             try:
-
-                product = Product.find_by_id(_id=data['product_id'])
                 avis_list = Avis.find_all_by_product_id(product_id=product.id)
                 keys_to_patch = dict()
 
                 i=0
                 if avis_list:
-                    
                     for a in avis_list:
                         i+=1
                 
@@ -103,22 +103,23 @@ class UserAvis(Resource):
 
                 avis.add_to_db()
                 product.patch_in_db(keys_to_patch)
+                avis_json = avis.json(user_name=user.username)
 
             except Exception as e:
                 logging.error(e)
                 abort(422, 'An error occurred creating the avis')
+            else:
 
-            avis_json = avis.json(user_name=user.username)
-            response = current_app.response_class(response=json.dumps(avis_json), status=201,
-                                                mimetype='application/json')
-            return response
+                response = current_app.response_class(response=json.dumps(avis_json), status=201,
+                                                    mimetype='application/json')
+                return response
 
 
     @token_required
     def delete(self, user):
         """
-            Delete a Product
-            :params:    name: nameof the product to delete
+            Delete avis
+            :params:    id: id the product to delete
 
             :return: str
             :rtype: application/json.
@@ -137,26 +138,23 @@ class UserAvis(Resource):
         else:
             avis = Avis.find_by_id(id=data['id'], user_id=data['user_id'])
             if not avis:
-                abort(405, 'Prestataire could not be found')
+                abort(404, 'Prestataire could not be found')
                 
             avis.remove_from_db()
 
         response = current_app.response_class(response=json.dumps({'message':'avis deleted'}), status=203, mimetype='application/json')
-
         return response
 
 
     @token_required
     def patch(self, user):
         """
-            Patch a Product
-            :params:    name: name of the product to patch
-                        description: description of the product to patch
-                        stock: stock of the product to patch
-                        prix: prix of the product to patch
-                        store_id: store of the product to patch
+            Patch a Avis
+            :params:    id: id of the Avis to patch
+                        comentary: comentary of the Avis to patch
+                        note: note of the Avis to patch
 
-            :return: Product json data 
+            :return: Avis json data 
             :rtype: application/json.
         """
         parser = reqparse.RequestParser()
@@ -187,8 +185,8 @@ class UserAvis(Resource):
                 
             except Exception as e:
                 logging.error(e) 
-                response = current_app.response_class(response=json.dumps(dict(message=keys_to_patch)), status=405, mimetype='application/json')
-
                 abort(405, 'Missing required parameter in the JSON body')
-            response = current_app.response_class(response=json.dumps(dict(message='avis udpated')), status=204, mimetype='application/json')
-            return response
+                
+            else:
+                response = current_app.response_class(response=json.dumps(dict(message='avis udpated')), status=204, mimetype='application/json')
+                return response

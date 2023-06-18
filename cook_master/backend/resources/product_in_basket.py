@@ -77,19 +77,20 @@ class ProductBasket(Resource):
                 prix=float(data['quantity'])*product.prix
                 product_in_basket = ProductInBasket(basket_id=basket.id, product_id=data['product_id'], quantity=data['quantity'], prix=prix)
             else:
-                abort(422, 'Max quantity execeed')
+                abort(400, 'Max quantity execeed')
  
             try:
                 product_in_basket.add_to_db()
+                product_in_basket_json = product_in_basket.json()
 
             except Exception as e:
                logging.error(e)
                abort(422, 'An error occurred adding the product to the basket')
-
-            product_in_basket_json = product_in_basket.json()
-            response = current_app.response_class(response=json.dumps(product_in_basket_json), status=201,
-                                                mimetype='application/json')
-            return response
+               
+            else:
+                response = current_app.response_class(response=json.dumps(product_in_basket_json), status=201,
+                                                    mimetype='application/json')
+                return response
 
 
     @token_required
@@ -97,7 +98,7 @@ class ProductBasket(Resource):
         """
             Patch an ProductBasket
             :type user: User
-            :params:    id: quantity of the product basket to patch
+            :params:    id: id of the product basket to patch
                         quantity: quantity of the product basket to patch
             
             :return: ProductBasket json data.
@@ -127,26 +128,26 @@ class ProductBasket(Resource):
             product = Product.find_by_id(_id=product_in_basket.product_id)
             if not product:
                 abort(405, 'Product could not be found')
+            
+            if product.stock < int(data['quantity']):
+                abort(422, 'Max quantity execeed')
 
             try:
-                if product.stock >= int(data['quantity']):
-                    keys_to_patch = dict() 
-                    keys_to_patch['quantity'] = data['quantity']
-                    keys_to_patch['prix'] = float(data['quantity'])*product.prix
-                    product_in_basket.patch_in_db(keys_to_patch)
-
-                else:
-                    abort(422, 'Max quantity execeed')
+                keys_to_patch = dict() 
+                keys_to_patch['quantity'] = data['quantity']
+                keys_to_patch['prix'] = float(data['quantity'])*product.prix
+                product_in_basket.patch_in_db(keys_to_patch)
+                product_in_basket_json = product_in_basket.json()
 
             except Exception as e:
                 logging.error(e)
                 abort(422, 'An error occurred updating the product to the basket')
 
-            product_in_basket_json = product_in_basket.json()
-            response = current_app.response_class(response=json.dumps(product_in_basket_json), status=201,
-                                                mimetype='application/json')
-            return response
-    
+            else:
+                response = current_app.response_class(response=json.dumps(product_in_basket_json), status=201,
+                                                    mimetype='application/json')
+                return response
+        
 
     @token_required
     def delete(self, user): 
@@ -182,6 +183,7 @@ class ProductBasket(Resource):
                 logging.error(e)
                 abort(422, 'An error occurred deleting the product to the basket')
 
-            response = current_app.response_class(response=json.dumps(dict(message='product in basket deleted')), status=201,
-                                                mimetype='application/json')
-            return response
+            else:
+                response = current_app.response_class(response=json.dumps(dict(message='product in basket deleted')), status=201,
+                                                    mimetype='application/json')
+                return response
