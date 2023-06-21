@@ -11,6 +11,9 @@ from flask import Flask
 from flask_mail import Mail
 from flask_cors import CORS
 from flask_talisman import Talisman
+from apispec import APISpec
+from apispec.ext.marshmallow import MarshmallowPlugin
+from flask_apispec.extension import FlaskApiSpec
 
 """
     Initial Configuration of our api
@@ -36,6 +39,7 @@ else:
     production = False
     
 app = Flask(__name__)
+#app = APIFlask(__name__, spec_path='/spec')
 cors = CORS(app)
 
 
@@ -45,8 +49,20 @@ app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
 app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
 app.config['MAIL_USE_TLS'] = bool(strtobool(os.environ.get('MAIL_USE_TLS', 'False')))
 app.config['MAIL_USE_SSL'] = bool(strtobool(os.environ.get('MAIL_USE_SSL', 'False')))
+app.config['SPEC_FORMAT'] = 'yaml'
+app.config.update({
+    'APISPEC_SPEC': APISpec(
+        title='Awesome Project',
+        version='v1',
+        plugins=[MarshmallowPlugin()],
+        openapi_version='2.0.0'
+    ),
+    'APISPEC_SWAGGER_URL': '/swagger/',  # URI to access API Doc JSON 
+    'APISPEC_SWAGGER_UI_URL': '/swagger-ui/'  # URI to access UI of API Doc
+})
 
 mail = Mail(app)
+docs = FlaskApiSpec(app)
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # app.config['JSON_AS_ASCII'] = False

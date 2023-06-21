@@ -11,7 +11,7 @@ from flask import request, make_response, jsonify, current_app
 from werkzeug.security import check_password_hash
 from flask_restful import Resource
 
-from resources.user import User
+from resources.account.user import User
 
 
 class Login(Resource):

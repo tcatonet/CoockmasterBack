@@ -22,8 +22,18 @@ from resources.verification import token_required
 from models.user import User
 from models.ecommerce import Basket
 
+from marshmallow import Schema, fields
+from flask_apispec import marshal_with, doc, use_kwargs
+from flask_apispec.views import MethodResource
 
-class UserRegister(Resource):
+class AwesomeResponseSchema(Schema):
+    message = fields.Str(default='Success')
+
+class AwesomeRequestSchema(Schema):
+    api_type = fields.String(required=True, description="API type of awesome API")
+
+
+class UserRegister(MethodResource, Resource):
 
     """ Users' endpoint. """
     
@@ -53,6 +63,9 @@ class UserRegister(Resource):
         return local_args_namespace
     
 
+    @doc(description='My First GET Awesome API.', tags=['Awesome'])
+    @use_kwargs(AwesomeRequestSchema, location=('json'))
+    @marshal_with(AwesomeResponseSchema)
     @token_required
     def get(self, user): 
         """

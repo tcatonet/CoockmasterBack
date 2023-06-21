@@ -40,3 +40,5 @@ Werkzeug==2.0.0
 zipp==3.8.1
 zope.event==4.5.0
 zope.interface==5.4.0
+flask-apispec
+marshmallow

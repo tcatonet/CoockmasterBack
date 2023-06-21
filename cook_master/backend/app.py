@@ -7,7 +7,7 @@ import signal
 
 from flask_restful import Api
 from gevent import pywsgi
-from config import app
+from config import app, docs
 from flask_jwt import JWT
 from sqlalchemy import text
 
@@ -15,20 +15,20 @@ from functools import partial
 from resources.map import adv_mapping
 from resources.map import app_mapping
 from resources.online import app_online
-from resources.user import UserRegister
+from resources.account.user import UserRegister
 from resources.mail import Mail
-from resources.login import Login
-from resources.store import StoreProduct
-from resources.product import ProductInStore
-from resources.product_in_basket import ProductBasket
-from resources.basket import UserBasket
-from resources.order import UserOrder
-from resources.adress import UserAdress
-from resources.room import CompanyRoom
-from resources.prestataire import CompanyPrestataire
-from resources.event_categorie import EventCatrgorie
-from resources.product_categorie import StoreProductCategorie
-from resources.avis import UserAvis
+from resources.account.login import Login
+from resources.ecommerce.store import StoreProduct
+from resources.ecommerce.product import ProductInStore
+from resources.ecommerce.product_in_basket import ProductBasket
+from resources.ecommerce.basket import UserBasket
+from resources.ecommerce.order import UserOrder
+from resources.account.adress import UserAdress
+from resources.event.room import CompanyRoom
+from resources.event.prestataire import CompanyPrestataire
+from resources.event.event_categorie import EventCatrgorie
+from resources.ecommerce.product_categorie import StoreProductCategorie
+from resources.ecommerce.avis import UserAvis
 
 from models.user import User
 
@@ -56,6 +56,7 @@ jwt = JWT(app, authenticate, identity)
 
 # adding resources endpoints
 api = Api(app) 
+
 app.register_blueprint(app_online) 
 app.register_blueprint(app_mapping)
 app.register_blueprint(adv_mapping)  
@@ -78,6 +79,9 @@ api.add_resource(CompanyPrestataire, '/company_prestataire')
 api.add_resource(EventCatrgorie, '/event_catrgorie')
 api.add_resource(StoreProductCategorie, '/product_catrgorie')
  
+
+docs.register(UserRegister)
+
 # we choose simply between dev and prod environment 
 if production:
     logging.warning('starting production server !') 

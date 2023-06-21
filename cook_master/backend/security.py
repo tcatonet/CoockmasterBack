@@ -8,15 +8,15 @@ from flask import request, jsonify, current_app, abort, make_response
 
 from werkzeug.security import check_password_hash
 from datetime import datetime, timedelta
-from resources.user import User
+from resources.account.user import User
 
 
 def identity(payload):
     user_id = payload['identity']
-    return User.find_by_id(user_id)
+    return User.find_by_id(user_id) 
 
 
-def authenticate():
+def authenticate(): 
     # creates dictionary of form data
     auth = request.form
     
