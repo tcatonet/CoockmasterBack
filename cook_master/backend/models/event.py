@@ -15,6 +15,7 @@ class Room(db.Model):
     city = db.Column(db.String(50))
     postcode = db.Column(db.String(50))
     adress = db.Column(db.String(50))
+    capacity = db.Column(db.Integer)
 
     room_in_event = db.relationship('RoomInEvent', back_populates="room")
 
@@ -25,7 +26,7 @@ class Room(db.Model):
         :return: this store and all its items.
         :rtype: JSON.
         """
-        obj = dict(id=self.id, city=self.city, postcode=self.postcode, adress=self.adress)
+        obj = dict(id=self.id, city=self.city, postcode=self.postcode, adress=self.adress, capacity=self.capacity)
         response = jsonify(json.dumps(obj, ensure_ascii=False))
         response.headers["Content-Type"] = "application/json; charset=utf-8"
         return obj
@@ -39,7 +40,7 @@ class Room(db.Model):
         """
         json_room = []
         for room in room_list:
-            obj = dict(id=room.id, city=room.city, postcode=room.postcode, adress=room.adress)
+            obj = dict(id=room.id, city=room.city, postcode=room.postcode, adress=room.adress, capacity=room.capacity)
             json_room.append(obj)
 
         response = jsonify(json.dumps(json_room, ensure_ascii=False))
@@ -81,6 +82,7 @@ class Room(db.Model):
         """
          
         return cls.query.filter_by(id=id).first()
+    
 
     @classmethod
     def find_all(cls):
@@ -102,6 +104,7 @@ class Prestataire(db.Model):
     firstname = db.Column(db.String(50))
     activite = db.Column(db.String(50))
     description = db.Column(db.String(50))
+    email = db.Column(db.String(50))
 
     prestataire_in_event = db.relationship('PrestataireInEvent', back_populates="prestataire")
 
@@ -113,9 +116,19 @@ class Prestataire(db.Model):
         :rtype: JSON.
         """
         obj = dict(id=self.id, lastname=self.lastname, firstname=self.firstname, activite=self.activite, description=self.description)
-        response = jsonify(json.dumps(obj, ensure_ascii=False))
-        response.headers["Content-Type"] = "application/json; charset=utf-8"
         return obj
+
+
+    def json_admin(self):
+        """
+        Converts this store and all its items to JSON.
+
+        :return: this store and all its items.
+        :rtype: JSON.
+        """
+        obj = dict(id=self.id, lastname=self.lastname, firstname=self.firstname, email=self.email, activite=self.activite, description=self.description)
+        return obj
+
 
     def all_json(prestataire_list):
         """
@@ -168,6 +181,19 @@ class Prestataire(db.Model):
         """
          
         return cls.query.filter_by(id=id).first()
+
+    @classmethod
+    def find_by_email(cls, email):
+        """ 
+            Selects a user from the DB and returns it.
+
+            :param _id: the id of the user.
+            :type _id: int
+            :return: a user.
+            :rtype: UserModel.
+        """
+         
+        return cls.query.filter_by(email=email).first()
 
     @classmethod
     def find_all(cls):
@@ -266,30 +292,30 @@ class Categorie(db.Model):
         """
          
         return cls.query.filter_by().all()
-    
+
 
 class Event(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), unique=True)
     description = db.Column(db.String(1000))
+    public = db.Column(db.Boolean(), default=False)
 
     categorie_id = db.Column(db.Integer, db.ForeignKey('categorie.id'))
     categorie = db.relationship("Categorie", back_populates="event")
 
     rooms = db.relationship('RoomInEvent', back_populates="event")
     prestataires = db.relationship('PrestataireInEvent', back_populates="event")
-
-    def json(self, json_prestataire, json_room, json_categorie):
-        """
+    event_list_user = db.relationship('EventUserSubscription', back_populates="event")
+ 
+    def json(self, prestataire, room, categorie=None):
+        """ 
         Converts this store and all its items to JSON.
-
+ 
         :return: this store and all its items.
-        :rtype: JSON.
+        :rtype: JSON. 
         """
-
-        obj = dict(id=self.id, prestataire=json_prestataire, room=json_room, categorie=json_categorie)
-        response = jsonify(json.dumps(obj, ensure_ascii=False))
-        response.headers["Content-Type"] = "application/json; charset=utf-8"
+        res_cat = categorie if categorie else self.categorie_id
+        obj = dict(id=self.id, name=self.name, description=self.description, prestataire=prestataire, room=room, categorie=res_cat, public=self.public)
         return obj
 
     def all_json(event_list):
@@ -367,7 +393,7 @@ class RoomInEvent(db.Model):
     event = db.relationship("Event", back_populates="rooms")
 
     def __repr__(self):
-        return "<TableName(id='%s')>" % self.id
+        return "<TableName(id='%s')>" % self.id 
 
     def json(self):
         """
@@ -377,8 +403,6 @@ class RoomInEvent(db.Model):
         :rtype: JSON.
         """
         obj = dict(id=self.id, room_id=self.room_id, event_id=self.event_id)
-        response = jsonify(json.dumps(obj, ensure_ascii=False))
-        response.headers["Content-Type"] = "application/json; charset=utf-8"
         return obj
 
     def add_to_db(self):
@@ -404,7 +428,7 @@ class RoomInEvent(db.Model):
         db.session.commit()
 
     @classmethod
-    def find_by_id(cls, id, basket_id):
+    def find_by_id(cls, id):
         """
             Selects a user from the DB and returns it.
 
@@ -413,10 +437,46 @@ class RoomInEvent(db.Model):
             :return: a user.
             :rtype: UserModel.
         """
-        return cls.query.filter_by(id=id, basket_id=basket_id).first()
+        return cls.query.filter_by(id=id).first()
+    
+    @classmethod
+    def find_by_event_id(cls, event_id):
+        """
+            Selects a user from the DB and returns it.
+
+            :param _id: the id of the user.
+            :type _id: int
+            :return: a user.
+            :rtype: UserModel.
+        """
+        return cls.query.filter_by(event_id=event_id).all()
+    
+    @classmethod
+    def find_by_room_event_id(cls, room_id, event_id):
+        """
+            Selects a user from the DB and returns it.
+
+            :param _id: the id of the user.
+            :type _id: int
+            :return: a user.
+            :rtype: UserModel.
+        """
+        return cls.query.filter_by(room_id=room_id, event_id=event_id).first()
 
     @classmethod
-    def get_all(cls, basket_id):
+    def find_by_room_id(cls, room_id):
+        """
+            Selects a user from the DB and returns it.
+
+            :param _id: the id of the user.
+            :type _id: int
+            :return: a user.
+            :rtype: UserModel.
+        """
+        return cls.query.filter_by(room_id=room_id).all()
+
+    @classmethod
+    def get_all(cls):
         """
             Selects a store from the DB and returns it.
 
@@ -425,7 +485,7 @@ class RoomInEvent(db.Model):
             :return: a user.
             :rtype: UserModel.
         """
-        return cls.query.filter_by(basket_id=basket_id)
+        return cls.query.filter_by().all()
 
 
 class PrestataireInEvent(db.Model):
@@ -474,7 +534,7 @@ class PrestataireInEvent(db.Model):
         db.session.commit()
 
     @classmethod
-    def find_by_id(cls, id, basket_id):
+    def find_by_id(cls, id):
         """
             Selects a user from the DB and returns it.
 
@@ -483,10 +543,51 @@ class PrestataireInEvent(db.Model):
             :return: a user.
             :rtype: UserModel.
         """
-        return cls.query.filter_by(id=id, basket_id=basket_id).first()
+        return cls.query.filter_by(id=id).first()
+
+
+
 
     @classmethod
-    def get_all(cls, basket_id):
+    def find_by_prestataire_id(cls, prestataire_id):
+        """
+            Selects a user from the DB and returns it.
+
+            :param _id: the id of the user. 
+            :type _id: int
+            :return: a user.
+            :rtype: UserModel.
+        """
+        return cls.query.filter_by(prestataire_id=prestataire_id).all()
+
+
+    @classmethod
+    def find_by_prestataire_event_id(cls, prestataire_id, event_id):
+        """
+            Selects a user from the DB and returns it.
+
+            :param _id: the id of the user.
+            :type _id: int
+            :return: a user.
+            :rtype: UserModel.
+        """
+        return cls.query.filter_by(prestataire_id=prestataire_id, event_id=event_id).first()
+
+ 
+    @classmethod
+    def find_by_event_id(cls, event_id):
+        """
+            Selects a user from the DB and returns it.
+
+            :param _id: the id of the user.
+            :type _id: int
+            :return: a user.
+            :rtype: UserModel.
+        """
+        return cls.query.filter_by(event_id=event_id).all()
+    
+    @classmethod
+    def get_all(cls):
         """
             Selects a store from the DB and returns it.
 
@@ -495,4 +596,65 @@ class PrestataireInEvent(db.Model):
             :return: a user.
             :rtype: UserModel.
         """
-        return cls.query.filter_by(basket_id=basket_id)
+        return cls.query.filter_by()
+
+
+class EventUserSubscription(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+
+    event_id = db.Column(db.Integer, db.ForeignKey('event.id'))
+    event = db.relationship("Event", back_populates="event_list_user")
+
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    user = db.relationship("User", back_populates="event_list_user")
+
+    def __init__(self, user_id, event_id):
+        self.user_id = user_id
+        self.event_id = event_id
+
+    def json(self):
+        """
+        Converts this store and all its items to JSON.
+
+        :return: this store and all its items.
+        :rtype: JSON.
+        """
+        obj = dict(id=self.id, event_id=self.event_id, user_id=self.user_id)
+        response = jsonify(json.dumps(obj, ensure_ascii=False))
+        response.headers["Content-Type"] = "application/json; charset=utf-8"
+        return obj
+
+    def add_to_db(self):
+        """
+            Inserts this user in the DB. 
+        """
+        db.session.add(self)
+        db.session.commit()
+
+    @classmethod
+    def find_by_id(cls, id):
+        """
+            Selects a user from the DB and returns it.
+
+            :param _id: the id of the user.
+            :type _id: int
+            :return: a user.
+            :rtype: UserModel.
+        """
+        return cls.query.filter_by(id=id).first()
+
+    def all_json(event_list):
+        """
+        Converts this store and all its items to JSON.
+
+        :return: this store and all its items.
+        :rtype: JSON.
+        """
+        json_event = []
+        for event in event_list:
+            obj = dict(id=event.id, name=event.name, description=event.description)
+            json_event.append(obj)
+
+        response = jsonify(json.dumps(json_event, ensure_ascii=False))
+        response.headers["Content-Type"] = "application/json; charset=utf-8"
+        return json_event

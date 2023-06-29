@@ -5,22 +5,27 @@
 import json
 import copy
 import logging
+import re
 
 from argparse import Namespace
 from flask import abort, current_app
 from flask_restful import Resource, reqparse
 
-from models.event import Prestataire
+from models.event import Prestataire, PrestataireInEvent
 from resources.verification import token_required, admin_token_required
+from utils.validation import valid_email_regex
+
+from utils.global_config import ADMIN_LEVEL
 
 
 class CompanyPrestataire(Resource):
 
-    """ Product endpoint. """
+    """ Prestataire endpoint. """
 
     id = Namespace(name='id', default=0, dest="id", action='store', type=int)
     lastname = Namespace(name='lastname', default=0, dest="lastname", action='store', type=str)
     firstname = Namespace(name='firstname', default=0, dest="firstname", action='store', type=str)
+    email = Namespace(name='email', default=0, dest="email", action='store', type=str)
     activite = Namespace(name='activite', default=0, dest="activite", action='store', type=str)
     description = Namespace(name='description', default=0, dest="description", action='store', type=str)
 
@@ -56,6 +61,7 @@ class CompanyPrestataire(Resource):
         parser = reqparse.RequestParser()
         parser.add_argument(**vars(self.__required__(self.lastname)))
         parser.add_argument(**vars(self.__required__(self.firstname)))
+        parser.add_argument(**vars(self.__required__(self.email)))
         parser.add_argument(**vars(self.__required__(self.activite)))
         parser.add_argument(**vars(self.__required__(self.description)))
 
@@ -68,6 +74,8 @@ class CompanyPrestataire(Resource):
             abort(400, 'Missing required parameter in the JSON body')
         
         else:
+            if not re.match(valid_email_regex, data['email']):
+                abort(400, 'invalid email')
             if data['firstname'] == '':
                 abort(400, 'invalid firstname')
             if data['lastname'] == '':
@@ -77,13 +85,15 @@ class CompanyPrestataire(Resource):
             if data['activite'] == '':
                 abort(400, 'invalid activite')
 
+            existing_prestataire= Prestataire.find_by_email(email=data['email'])
+            if existing_prestataire:
+                abort(400, 'prestataire already exist')
+
             prestataire = Prestataire(lastname=data['lastname'], firstname=data['firstname'], activite=data['activite'], description=data['description'])
-            if not prestataire:
-                abort(405, 'Prestataire could not be found')
 
             try:
                 prestataire.add_to_db()
-                prestataire_json = prestataire.json()
+                prestataire_json = prestataire.json_admin()
 
             except Exception as e:
                 logging.error(e)
@@ -110,12 +120,15 @@ class CompanyPrestataire(Resource):
         data = parser.parse_args()
         del parser
 
-        if data['id']: 
+        if data['id']:                 
             prestataire = Prestataire.find_by_id(id=data['id'])
             if not prestataire:
                 abort(405, 'Prestataire could not be found')
 
-            json_prestataire = prestataire.json()
+            if user.level == ADMIN_LEVEL:
+                json_prestataire = prestataire.json_admin()
+            else:
+                json_prestataire = prestataire.json()
 
         else:
             prestataire_list = Prestataire.find_all()
@@ -152,10 +165,18 @@ class CompanyPrestataire(Resource):
         else: 
             prestataire = Prestataire.find_by_id(id=data['id']) 
             if not prestataire:
-                abort(405, 'Prestataire could not be found')
+                abort(405, 'Prestataire couldPrestataireInEvent not be found')
+ 
+            prestataire_in_events = PrestataireInEvent.find_by_prestataire_id(prestataire_id=prestataire.id)
+            for prestataire_in_event in prestataire_in_events:
+                try:
+                    prestataire_in_event.remove_from_db()
+                except Exception as e:
+                    logging.error(e) 
+                    abort(400, 'Cannot remove prestataire from event')
 
             try:
-                prestataire.remove_from_db()
+                prestataire.remove_from_db() 
 
             except Exception as e:
                 logging.error(e)
@@ -182,6 +203,7 @@ class CompanyPrestataire(Resource):
         parser = reqparse.RequestParser()
         parser.add_argument(**vars(self.__required__(self.id)))
         parser.add_argument(**vars(self.__optional__(self.lastname)))
+        parser.add_argument(**vars(self.__optional__(self.email)))
         parser.add_argument(**vars(self.__optional__(self.firstname)))
         parser.add_argument(**vars(self.__optional__(self.activite)))
         parser.add_argument(**vars(self.__optional__(self.description)))
@@ -195,6 +217,14 @@ class CompanyPrestataire(Resource):
             abort(400, dict(message='Missing required parameter in the JSON body'))
 
         else:
+            if data['email']:
+                if not re.match(valid_email_regex, data['email']):
+                    abort(400, 'invalid email')
+
+                existing_prestataire= Prestataire.find_by_email(email=data['email'])
+                if existing_prestataire:
+                    abort(400, 'prestataire already exist')
+
             keys_to_patch = dict()
             for key in data.keys():
                 if data[key] and data[key] != '': 
