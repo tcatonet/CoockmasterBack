@@ -10,8 +10,9 @@ from argparse import Namespace
 from resources.verification import token_required
 from flask import abort, current_app
 from flask_restful import Resource, reqparse
+from utils.global_config import CLOSE, PRIVATE
 
-from models.event import Event, EventUserSubscription
+from models.event import Event, EventUserSubscription, RoomInEvent
 
 
 class EventSubscription(Resource):
@@ -41,7 +42,7 @@ class EventSubscription(Resource):
 
     @token_required
     def post(self, user): 
-        """
+        """ 
             Post an EventUserSubscription
             :type user: User 
             :params:    event_id: event id of the user
@@ -55,7 +56,7 @@ class EventSubscription(Resource):
 
         try:
             data = parser.parse_args()
-            del parser
+            del parser 
  
         except Exception as e:
             logging.error(e) 
@@ -66,19 +67,42 @@ class EventSubscription(Resource):
             if not event:
                 abort(405, 'Event could not be found')
 
-            event_list_user = EventUserSubscription(user_id=user.id, event_id=data['event_id'])
- 
+            if event.access == CLOSE:
+                abort(400, 'The subscriptions for this event are closed')
+
+            event_room_list = RoomInEvent.find_by_event_id(event_id=event.id)
+            
+            room_affect_to_user = None
+            remaining_capacity = 0
+            for event_room in event_room_list:
+                remaining_capacity = event_room.max_capacity-event_room.current_capacity
+                if remaining_capacity > 0:
+                    room_affect_to_user=event_room
+            
+            if room_affect_to_user: 
+                room_affect_to_user
+                remaining_capacity -=1
+                room_affect_to_user.patch_in_db({"current_capacity": event_room.current_capacity+1})
+
+            else:
+                abort(400, 'The subscriptions for this event are closed '+str(event_room_list))
+
+            if not remaining_capacity:
+                event.patch_in_db({"access": CLOSE})
+
+            event_subscription = EventUserSubscription(user_id=user.id, event_id=data['event_id'], room_id=room_affect_to_user.room_id)
+
             try:
-                event_list_user.add_to_db()
-                event_list_user_json = event_list_user.json()
+                event_subscription.add_to_db()
+                event_subscription_json = event_subscription.json()
 
             except Exception as e:
                logging.error(e)
-               abort(422, 'An error occurred subscribint the user to the event')
+               abort(422, 'An error occurred subscribing a user to an event')
                
             else:
-                response = current_app.response_class(response=json.dumps(event_list_user_json), status=201,
-                                                    mimetype='application/json')
+                response = current_app.response_class(response=json.dumps(event_subscription_json), status=201,
+                                                    mimetype='application/json') 
                 return response
 
 
@@ -98,20 +122,17 @@ class EventSubscription(Resource):
         del parser
 
         if data['id']: 
-            event = EventUserSubscription.find_by_id(id=data['id'])
-            if not event:
-                abort(405, 'Event could not be found')
+            event_subscription = EventUserSubscription.find_by_id(id=data['id'])
+            if not event_subscription:
+                abort(405, 'Event subscription could not be found') 
 
-            json_event_user = event.json()
+            event_subscription_json = event_subscription.json()
 
         else:
-            event_list = EventUserSubscription.find_all()
-            if not event_list:
-                abort(405, 'Event list could not be found')
+            event_list = EventUserSubscription.find_by_user_id(user_id=user.id)
+            event_subscription_json = EventUserSubscription.all_json(event_list=event_list)
 
-            json_event_user = EventUserSubscription.all_json(prestataire_list=event_list)
-
-        response = current_app.response_class(response=json.dumps(json_event_user), status=200,
+        response = current_app.response_class(response=json.dumps(event_subscription_json), status=200,
                                                       mimetype='application/json')
         return response
 
@@ -137,17 +158,21 @@ class EventSubscription(Resource):
             logging.error(e)
             abort(400, 'Missing required parameter in the JSON body')
         
-        else:
+        else: 
             try:
-                event_user = EventUserSubscription.find_by_id(id=data['id'])
-                if not event_user:
-                    abort(405, 'Event user could not be found')
+                event_subscription = EventUserSubscription.find_by_id(id=data['id'])
+                if not event_subscription:
+                    abort(405, 'Event subscription could not be found')
+
+                room_in_event = RoomInEvent.find_by_event_id_room_id(event_id=event_subscription.event_id, room_id=event_subscription.room_id)
+                room_in_event.patch_in_db({'current_capacity': room_in_event.current_capacity-1})
+                event_subscription.remove_from_db()
 
             except Exception as e:
                 logging.error(e)
                 abort(422, 'An error occurred deleting the user event subscription')
 
             else:
-                response = current_app.response_class(response=json.dumps(dict(message='event user deleted')), status=201,
+                response = current_app.response_class(response=json.dumps({'message':'Event subscription deleted'}), status=201,
                                                     mimetype='application/json')
                 return response

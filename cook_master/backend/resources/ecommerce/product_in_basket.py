@@ -69,7 +69,7 @@ class ProductBasket(Resource):
             if not basket:
                 abort(405, 'Basket could not be found')
 
-            product = Product.find_by_id(_id=data['product_id'])
+            product = Product.find_by_id(id=data['product_id'])
             if not product:
                 abort(405, 'Product could not be found')
 
@@ -125,7 +125,7 @@ class ProductBasket(Resource):
             if not product_in_basket:
                 abort(405, 'Product in basket could not be found')
 
-            product = Product.find_by_id(_id=product_in_basket.product_id)
+            product = Product.find_by_id(id=product_in_basket.product_id)
             if not product:
                 abort(405, 'Product could not be found')
             

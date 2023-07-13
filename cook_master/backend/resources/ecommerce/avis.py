@@ -71,7 +71,7 @@ class UserAvis(Resource):
             if data['note'] > 10 or data['note'] < 0:
                 abort(400, 'Rate out of range')
 
-            product = Product.find_by_id(_id=data['product_id'])
+            product = Product.find_by_id(id=data['product_id'])
             if not product:
                 abort(404, dict(message='Avis could not be found'))
 
@@ -170,7 +170,7 @@ class UserAvis(Resource):
             logging.error(e) 
             abort(400, dict(message='Missing required parameter in the JSON body'))
 
-        else:
+        else: 
             keys_to_patch = dict()
             for key in data.keys():
                 if data[key] and data[key] != '': 

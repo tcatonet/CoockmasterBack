@@ -4,6 +4,7 @@
 
 import json
 import jwt
+from datetime import datetime, timedelta
 
 from flask import Blueprint, current_app, abort, request
 from functools import wraps
@@ -34,6 +35,9 @@ def verification(token=''):
                                           mimetype='application/json')
     return response
  
+def generate_token(user):
+    return jwt.encode({'public_id': user.id, 'exp': datetime.utcnow() + timedelta(minutes=30)}, current_app.config['SECRET_KEY'])
+
 
 @mail_resend.route("/resend")
 @jwt_required()
@@ -62,8 +66,8 @@ def resend():
    
  
 def token_required(f): 
-   @wraps(f)
-   def decorator(*args, **kwargs): 
+   @wraps(f) 
+   def decorator(*args, **kwargs):  
        token = None 
        if 'x-access-tokens' in request.headers:  
            token = request.headers['x-access-tokens']
@@ -76,7 +80,7 @@ def token_required(f):
            user = User.query.filter_by(id=data['public_id']).first()
            if not user:
             abort(401, 'invalid token')
-       except:
+       except: 
             abort(401, 'invalid token') 
 
        return f(user=user, *args, **kwargs)

@@ -52,11 +52,10 @@ def send_delete_account_mail(new_user_email, flask_root_url, token):
     return confirmation_email
 
 
-def send_retrieve_password_mail(new_user_email, flask_root_url, token):
-    link = flask_root_url + f'verification/{token}'
+def send_retrieve_password_mail(new_user_email, password):
     confirmation_email = Message('Retrieve password !', sender=current_app.config['MAIL_USERNAME'], recipients=[new_user_email])
     body = 'Retrieve password !\n'
-    body += f'In order to complete your subscription, we just need you to visit once the following link: {link} \n'
+    body += f'Your new password: {password} \n'
     body += 'Bests regards\nThe CM Team'
     confirmation_email.body = body
     return confirmation_email

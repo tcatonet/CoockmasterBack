@@ -2,7 +2,7 @@
 # Version 1.4
 
 from db import db
-from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.security import generate_password_hash
 from flask import jsonify
 
 import json
@@ -14,13 +14,13 @@ from models.ecommerce import Adress
 class User(db.Model):
     """User model."""
 
-    __tablename__ = 'user'
+    __tablename__ = 'user' 
     # items = db.relationship('projects', lazy='dynamic')
    
     id = db.Column(db.Integer, primary_key=True, unique=True)
     basket = db.relationship("Basket",  uselist=False, backref="user")
     orders = db.relationship('Order', back_populates='user')
-    adress = db.relationship('Adress', back_populates='user')
+    adress = db.relationship('Adress', back_populates='user') 
     avis = db.relationship('Avis', back_populates='user')
 
     level = db.Column(db.Integer)
@@ -31,9 +31,11 @@ class User(db.Model):
     registered_on = db.Column(db.DateTime, default=datetime.utcnow())
     verified = db.Column(db.String(36))  # stores an uuid
     phone = db.Column(db.String(10), default='00.00.00.00.00')
-    first_name = db.Column(db.String(80)) 
+    first_name = db.Column(db.String(80))
     last_name = db.Column(db.String(80))
     email_validate = db.Column(db.Boolean)
+
+    event_list_user = db.relationship('EventUserSubscription', back_populates="user")
 
     # billing_address = db.Column(db.String(256))
 
@@ -41,7 +43,7 @@ class User(db.Model):
         self.username = username
         self.password = generate_password_hash(password)
         self.email = email
-        self.level = level
+        self.level = level 
         self.registered_on = datetime.utcnow()
         self.verified = str(uuid.uuid4())
  
@@ -85,7 +87,7 @@ class User(db.Model):
         return cls.query.filter_by(email=email).first()
 
     @classmethod
-    def find_by_id(cls, _id):
+    def find_by_id(cls, id):
         """
             Selects a user from the DB and returns it.
 
@@ -95,7 +97,7 @@ class User(db.Model):
             :rtype: UserModel.
         """
         
-        return cls.query.filter_by(id=_id).first()
+        return cls.query.filter_by(id=id).first()
 
     @classmethod
     def find_by_registration_token(cls, _token):
@@ -122,20 +124,20 @@ class User(db.Model):
             Update this user in the DB.
         """
 
-        num_rows_updated = self.query.filter_by(email=self.email).update(patch_values)
+        num_rows_updated = self.query.filter_by(id=self.id).update(patch_values)
         db.session.commit()
         return num_rows_updated
 
 
     def remove_from_db(self):
-        """
-            Deletes this user from the DB.
+        """  
+            Deletes this user from the DB. 
         """
         db.session.delete(self)
         db.session.commit()
 
     @classmethod
-    def get_all_users(cls):
+    def get_all_users(cls): 
         return len(cls.query.all())
 
     @classmethod
@@ -148,7 +150,7 @@ class User(db.Model):
         """
 
         orders_list = {'orders': []}
- 
+  
         for order in order_list:
             adress= Adress.find_by_id(id=order.adress_id, user_id=self.id)
             order_adress = dict(city=adress.city, postcode=adress.postcode, adress=adress.adress)

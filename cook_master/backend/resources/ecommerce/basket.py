@@ -15,7 +15,7 @@ from models.ecommerce import ProductInBasket, Basket, Product
 
 
 class UserBasket(Resource):
-
+ 
     """ Basket' endpoint. """
 
     id = Namespace(name='id', default=0, dest="id", action='store', type=int)

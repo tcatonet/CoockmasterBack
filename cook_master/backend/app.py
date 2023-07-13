@@ -16,17 +16,18 @@ from resources.map import adv_mapping
 from resources.map import app_mapping
 from resources.online import app_online
 from resources.mail import Mail
+from resources.retrieve_password import RetrievePassword
 
 from resources.account.user import UserRegister
 from resources.account.adress import UserAdress
 
-from resources.account.login import Login
+from resources.account.login import Login  
 from resources.ecommerce.store import StoreProduct
 from resources.ecommerce.product import ProductInStore
 from resources.ecommerce.product_in_basket import ProductBasket
 from resources.ecommerce.basket import UserBasket
 from resources.ecommerce.order import UserOrder
-from resources.ecommerce.product_categorie import StoreProductCategorie
+from resources.ecommerce.product_categorie import StoreProductCategorie 
 from resources.ecommerce.avis import UserAvis
 
 
@@ -37,8 +38,11 @@ from resources.event.event_categorie import EventCatrgorie
 from resources.event.event_subscription import EventSubscription
 
 from resources.content.content_categorie import ContentCatrgorie
-from resources.content.aggregate_content import ContentAggregate
-from resources.content.content import Content
+from resources.content.aggregate_content import AggregateContent
+from resources.content.content import ContentText
+
+
+
 
 from models.user import User  
 from utils.global_config import ADMIN_LEVEL
@@ -62,7 +66,7 @@ def create_tables():
 # Adding /auth end point:
 jwt = JWT(app, authenticate, identity)
 
-
+ 
 # adding resources endpoints
 api = Api(app) 
 
@@ -74,12 +78,14 @@ app.register_blueprint(mail_resend)
 app.register_blueprint(app_verification)
 
 
-api.add_resource(UserRegister, '/register')
+api.add_resource(UserRegister, '/user')
 api.add_resource(Mail, '/mail')
-api.add_resource(Login, '/login')
+api.add_resource(RetrievePassword, '/password/retrieve')
+
+api.add_resource(Login, '/login')  
 api.add_resource(StoreProduct, '/store')
 api.add_resource(StoreProductCategorie, '/product_catrgorie')
-api.add_resource(ProductInStore, '/product')
+api.add_resource(ProductInStore, '/product') 
 api.add_resource(ProductBasket, '/user_basket') 
 api.add_resource(UserBasket, '/basket')
 api.add_resource(UserOrder, '/user_order')
@@ -91,11 +97,11 @@ api.add_resource(CompanyPrestataire, '/company_prestataire')
 
 api.add_resource(UserEvent, '/event')
 api.add_resource(EventCatrgorie, '/event_catrgorie')
-api.add_resource(EventSubscription, '/event_subscription')
+api.add_resource(EventSubscription, '/event/subscription')
 
-api.add_resource(ContentCatrgorie, '/content_categorie')
-api.add_resource(ContentAggregate, '/content_aggregate')
-api.add_resource(Content, '/content')
+api.add_resource(ContentCatrgorie, '/content/categorie')
+api.add_resource(AggregateContent, '/content/aggregate')
+api.add_resource(ContentText, '/content')
 
 
 docs.register(UserRegister)
@@ -107,7 +113,7 @@ if production:
     log = 'default' if debug else None 
   
     ssl_args = {} 
-    import os
+    import os 
     if os.path.exists('server.key') and os.path.exists('server.crt'): 
         ssl_args = {'keyfile': 'server.key',
                     'certfile': 'server.crt'}

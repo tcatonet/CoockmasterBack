@@ -18,7 +18,7 @@ from werkzeug.security import generate_password_hash
 
 from utils.validation import valid_email_regex, valid_phone_regex, send_confirmation_mail, send_update_password_mail, send_update_email_mail, send_delete_account_mail
 from config import mail
-from resources.verification import token_required
+from resources.verification import token_required, generate_token
 from models.user import User
 from models.ecommerce import Basket
 
@@ -26,11 +26,11 @@ from marshmallow import Schema, fields
 from flask_apispec import marshal_with, doc, use_kwargs
 from flask_apispec.views import MethodResource
 
-class AwesomeResponseSchema(Schema):
-    message = fields.Str(default='Success')
-
-class AwesomeRequestSchema(Schema):
-    api_type = fields.String(required=True, description="API type of awesome API")
+class GetResponseSchema(Schema):
+    user_json = fields.String(default='')
+ 
+class GetRequestSchema(Schema):
+    email = fields.String(required=True)
 
 
 class UserRegister(MethodResource, Resource):
@@ -40,6 +40,8 @@ class UserRegister(MethodResource, Resource):
     id = Namespace(name='id', default=0, dest="id", action='store', type=int)
     email = Namespace(name='email', default="", dest="email", action='store', type=str, case_sensitive=True)
     password = Namespace(name='password', default="", dest="password", action='store', type=str, case_sensitive=True)
+    old_password = Namespace(name='old_password', default="", dest="old_password", action='store', type=str, case_sensitive=True)
+
     username = Namespace(name='username', default="", dest="username", action='store', type=str, case_sensitive=True)
     firstname = Namespace(name='firstname', default="", dest="firstname", action='store', type=str, case_sensitive=True)
     lastname = Namespace(name='lastname', default="", dest="lastname", action='store', type=str, case_sensitive=True)
@@ -63,9 +65,6 @@ class UserRegister(MethodResource, Resource):
         return local_args_namespace
     
 
-    @doc(description='My First GET Awesome API.', tags=['Awesome'])
-    @use_kwargs(AwesomeRequestSchema, location=('json'))
-    @marshal_with(AwesomeResponseSchema)
     @token_required
     def get(self, user): 
         """
@@ -80,16 +79,19 @@ class UserRegister(MethodResource, Resource):
         """
 
 
-        user = User.find_by_email(email=user.email)
+        user = User.find_by_id(id=user.id)
+        if not user:
+            abort(400, 'This user does not exist')
         if user:
-            response = current_app.response_class(response=json.dumps(user.json()), status=200,
+
+            user_json=user.json()
+            refresh_token = generate_token(user=user)
+            user_json['refresh_token'] = refresh_token.decode("utf-8") 
+            response = current_app.response_class(response=json.dumps(user_json), status=200,
                                                       mimetype='application/json')
             return response
         
-        else:    
-            abort(404, 'user not found')
-
- 
+   
     def post(self):
         """
             Creates a new item using the provided name, price and store_id.
@@ -136,7 +138,7 @@ class UserRegister(MethodResource, Resource):
                 abort(409, f'An user with the email |{data["email"]}| already exists')
 
             user = User(username=data['username'], email=data['email'], password=data['password'],
-                        level=0, first_name=data['firstname'], last_name=data['lastname'], phone=data['phone'])
+                        level=5, first_name=data['firstname'], last_name=data['lastname'], phone=data['phone'])
  
             try: 
                 user.add_to_db()
@@ -152,18 +154,15 @@ class UserRegister(MethodResource, Resource):
                 logging.error(e)
                 abort(422, 'An error occurred creating the user basket')
 
-            refresh_token = {
-                'refresh_token': jwt.encode({'public_id': user.id, 'exp': datetime.utcnow() + timedelta(minutes=30)}, current_app.config['SECRET_KEY'])
-                }
-            refresh_token = jwt.encode({'public_id': user.id, 'exp': datetime.utcnow() + timedelta(minutes=30)}, current_app.config['SECRET_KEY'])
-            user_json = user.json() 
+            user_json = user.json()
+            refresh_token = generate_token(user=user)
             user_json['refresh_token'] = refresh_token.decode("utf-8") 
             response = current_app.response_class(response=json.dumps(user_json), status=201,
                                                 mimetype='application/json')
             code = random.randint(10000,99999)
             msg = send_confirmation_mail(user.email, code)
 
-            try:
+            try: 
                 mail.send(msg)
                 keys_to_patch = dict()
                 keys_to_patch['code'] = code
@@ -187,26 +186,41 @@ class UserRegister(MethodResource, Resource):
         :return: success or failure.
         :rtype: application/json response.
         """ 
+        parser = reqparse.RequestParser()
+        parser.add_argument(**vars(self.__optional__(self.password)))
 
+         
         try:
-            user.remove_from_db()
+            data = parser.parse_args()
+            del parser
 
         except Exception as e:
             logging.error(e)
-            abort(422, 'An error occurred deleting the product')
-
+            abort(400, 'Missing required parameter in the JSON body')
+         
         else:
-            response = current_app.response_class(response=json.dumps(dict(message='user deleted')), status=204, mimetype='application/json')
-            msg = send_delete_account_mail(user.email, request.url_root, user.verified)
-            
+
+            if data['password'] != user.password:
+                abort(400, 'Incorect password')
             try:
-                mail.send(msg)
-            except ConnectionRefusedError as e:
-                current_app.logger.warning('Could not send delete account email')
-                current_app.logger.warning(e)
-            except ssl.SSLError as e:
-                current_app.logger.warning(e)
-            return response
+                user.remove_from_db()
+
+            except Exception as e:
+                logging.error(e)
+                abort(422, 'An error occurred deleting the product')
+
+            else:
+                response = current_app.response_class(response=json.dumps(dict(message='user deleted')), status=204, mimetype='application/json')
+                msg = send_delete_account_mail(user.email, request.url_root, user.verified)
+                
+                try:
+                    mail.send(msg)
+                except ConnectionRefusedError as e:
+                    current_app.logger.warning('Could not send delete account email')
+                    current_app.logger.warning(e)
+                except ssl.SSLError as e:
+                    current_app.logger.warning(e)
+                return response
 
 
     @token_required 
@@ -224,11 +238,12 @@ class UserRegister(MethodResource, Resource):
         parser = reqparse.RequestParser()
         parser.add_argument(**vars(self.__optional__(self.email)))
         parser.add_argument(**vars(self.__optional__(self.username)))
+        parser.add_argument(**vars(self.__optional__(self.old_password)))
         parser.add_argument(**vars(self.__optional__(self.password)))
         parser.add_argument(**vars(self.__optional__(self.firstname)))
         parser.add_argument(**vars(self.__optional__(self.lastname)))
         parser.add_argument(**vars(self.__optional__(self.phone)))
-         
+
         try:
             data = parser.parse_args()
             del parser 
@@ -236,13 +251,15 @@ class UserRegister(MethodResource, Resource):
         except Exception as e:
             logging.error(e)
             abort(400, 'Missing required parameter in the JSON body')
-         
+          
         else:
+            if data['old_password'] != user.password:
+                abort(400, 'mistmatch password')
             if not re.match(valid_email_regex, data['email']):
                 abort(400, 'invalid email')
             if data['phone'] != '' and not re.match(valid_phone_regex, data['phone']):
                 abort(400, 'invalid phone number')
-
+ 
             if User.find_by_email(data['email']) and data['email'] != user.email:
                 abort(409, f'An user with the email |{data["email"]}| already exists')
 
@@ -275,7 +292,7 @@ class UserRegister(MethodResource, Resource):
             for key in data.keys():
                 if data[key] and data[key] != '':
                     keys_to_patch[key] = data[key]
-
+ 
             user = User.find_by_email(email=user.email)
 
             if not user:

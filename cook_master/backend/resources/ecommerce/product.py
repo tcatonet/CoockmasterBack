@@ -115,7 +115,7 @@ class ProductInStore(Resource):
                                                     mimetype='application/json')
                 return response
 
-
+ 
     def get(self): 
         """
             Get an Product 
@@ -125,10 +125,10 @@ class ProductInStore(Resource):
             :rtype: application/json.
         """
         parser = reqparse.RequestParser()
-        parser.add_argument(**vars(self.__required__(self.name)))
+        parser.add_argument(**vars(self.__optional__(self.id)))
 
-        try:
-            data = parser.parse_args()
+        try: 
+            data = parser.parse_args() 
             del parser
  
         except Exception as e:
@@ -136,22 +136,25 @@ class ProductInStore(Resource):
             abort(400, 'Missing required parameter in the JSON body')
 
         else:
-            product = Product.find_by_name(name=data['name'])
-            if not product:
-                abort(405, 'Product could not be found')
+            if data['id']:
+                product = Product.find_by_id(id=data['id'])
+                if not product:
+                    abort(405, 'Product could not be found') 
 
-            try:
-                avis_list = Avis.find_all_by_product_id(product_id=product.id)
-                json_list_avis = Avis.all_json(avis_list)
+                try:
+                    avis_list = Avis.find_all_by_product_id(product_id=product.id)
+                    json_list_avis = Avis.all_json(avis_list)
 
-            except Exception as e:
-                logging.error(e)
-                abort(400, 'An error occurred retrieving the product') 
-                
+                except Exception as e:
+                    logging.error(e)
+                    abort(400, 'An error occurred retrieving the product')
+            
             else:
-                response = current_app.response_class(response=json.dumps(product.json(product_avis=json_list_avis)), status=200,
+                pass
+                
+            response = current_app.response_class(response=json.dumps(product.json(product_avis=json_list_avis)), status=200,
                                                       mimetype='application/json')
-                return response
+            return response
 
 
     @admin_token_required

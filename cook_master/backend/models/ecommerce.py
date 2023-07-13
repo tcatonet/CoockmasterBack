@@ -7,7 +7,7 @@ from flask import jsonify
 import json
 from _datetime import datetime 
 import uuid
- 
+
  
 class Product(db.Model):
     id = db.Column(db.Integer, primary_key=True, unique=True)
@@ -174,7 +174,7 @@ class Product(db.Model):
         return cls.query.filter_by(store_id=store_id).filter(Product.prix<=max_price)
     
     @classmethod
-    def find_by_product_categorie_id(cls, store_id, product_categorie_id, min_price, max_price, min_note):
+    def find_by_product_categorie_id(cls, store_id, product_categorie_id, min_price, max_price, min_note, page):
         """
             Selects a user from the DB and returns it.
 
@@ -189,7 +189,6 @@ class Product(db.Model):
         if product_categorie_id:
             request=request.filter(Product.product_categorie_id==product_categorie_id).order_by(Product.date_creation.desc())
 
- 
         if min_price:  
             request=request.filter(Product.prix>=min_price).order_by(Product.prix.asc())
 
@@ -198,10 +197,23 @@ class Product(db.Model):
             
         if min_note:
             request=request.filter(Product.note>=min_note).order_by(Product.note.desc())
+ 
 
-        return request
+        limit_min=(page-1)*20-1
 
+        if limit_min<0:
+            limit_min =0
+ 
+        res = request[limit_min:page*20]
 
+        if not res and request:
+            request_len=len(request)
+            x_last_product=request_len%20-1
+            res = request[x_last_product:request_len]
+
+        return res
+
+ 
     @classmethod
     def find_by_product_by_filter(cls, product_categorie_id):
         """
@@ -221,11 +233,11 @@ class Product(db.Model):
             Deletes this user from the DB.
         """
         db.session.delete(self)
-        db.session.commit()
+        db.session.commit() 
 
 
     @classmethod
-    def find_by_id(cls, _id):
+    def find_by_id(cls, id):
         """
             Selects a user from the DB and returns it.
 
@@ -234,7 +246,7 @@ class Product(db.Model):
             :return: a user.
             :rtype: UserModel.
         """
-        return cls.query.filter_by(id=_id).first()
+        return cls.query.filter_by(id=id).first()
 
 
 class ProductCategorie(db.Model):
@@ -536,7 +548,7 @@ class Avis(db.Model):
         return cls.query.filter_by(product_in_order_id=product_in_order_id, product_id=product_id).first()
     
     @classmethod
-    def find_all_by_product_id(cls, product_id):
+    def find_all_by_product_id(cls, product_id, page=1):
         """ 
             Selects a user from the DB and returns it.
 
@@ -887,7 +899,7 @@ class Order(db.Model):
   
 
     @classmethod
-    def get_all(cls, user_id):
+    def find_all(cls, user_id, page):
         """
             Selects a user from the DB and returns it.
 
@@ -897,8 +909,20 @@ class Order(db.Model):
             :rtype: UserModel. 
         """
         
-        return cls.query.filter_by(user_id=user_id).order_by(Order.date_creation.desc()).all()
+        request=cls.query.filter_by(user_id=user_id).order_by(Order.date_creation.desc())
+        limit_min=(page-1)*20-1
 
+        if limit_min<0:
+            limit_min =0
+ 
+        res = request[limit_min:page*20]
+
+        if not res and request:
+            request_len=len(request)
+            x_last_product=request_len%20-1
+            res = request[x_last_product:request_len]
+
+        return res
  
     @classmethod
     def find_one_by_id(cls, id, user_id):

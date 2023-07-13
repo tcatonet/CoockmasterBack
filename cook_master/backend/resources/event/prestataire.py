@@ -6,6 +6,7 @@ import json
 import copy
 import logging
 import re
+from datetime import datetime
 
 from argparse import Namespace
 from flask import abort, current_app
@@ -23,12 +24,14 @@ class CompanyPrestataire(Resource):
     """ Prestataire endpoint. """
 
     id = Namespace(name='id', default=0, dest="id", action='store', type=int)
+    page = Namespace(name='page', default=0, dest="page", action='store', type=int)
     lastname = Namespace(name='lastname', default=0, dest="lastname", action='store', type=str)
     firstname = Namespace(name='firstname', default=0, dest="firstname", action='store', type=str)
     email = Namespace(name='email', default=0, dest="email", action='store', type=str)
     activite = Namespace(name='activite', default=0, dest="activite", action='store', type=str)
     description = Namespace(name='description', default=0, dest="description", action='store', type=str)
-
+    date_start = Namespace(name='date_start', default=0, dest="date_start", action='store', type=str)
+    date_end = Namespace(name='date_end', default=0, dest="date_end", action='store', type=str)
  
     @staticmethod
     def __required__(arg_namespace):
@@ -116,9 +119,13 @@ class CompanyPrestataire(Resource):
         """
         parser = reqparse.RequestParser()
         parser.add_argument(**vars(self.__optional__(self.id)))
+        parser.add_argument(**vars(self.__optional__(self.page)))
+        parser.add_argument(**vars(self.__optional__(self.date_start)))
+        parser.add_argument(**vars(self.__optional__(self.date_end)))
 
         data = parser.parse_args()
         del parser
+
 
         if data['id']:                 
             prestataire = Prestataire.find_by_id(id=data['id'])
@@ -131,7 +138,16 @@ class CompanyPrestataire(Resource):
                 json_prestataire = prestataire.json()
 
         else:
-            prestataire_list = Prestataire.find_all()
+            if not data['page']:                 
+                data['page']=1
+
+            if data['date_start'] and data['date_end']:
+                data['date_start']=datetime.strptime(data['date_start'], '%Y-%m-%d %H').date()
+                data['date_end']=datetime.strptime(data['date_end'], '%Y-%m-%d %H').date()
+                prestataire_list = Prestataire.find_all_by_date(page=data['page'], date_start=data['date_start'], date_end=data['date_end']) 
+            else:
+                prestataire_list = Prestataire.find_all(page=data['page'])
+
             if not prestataire_list:
                 abort(405, 'Prestataire list could not be found')
 

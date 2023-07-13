@@ -2,6 +2,7 @@
 # Version 1.0
 # -*- coding: utf-8 -*-
 
+from datetime import datetime
 import json
 import copy
 import logging
@@ -21,13 +22,15 @@ class UserEvent(Resource):
     """ Product endpoint. """
 
     id = Namespace(name='id', default=0, dest="id", action='store', type=int)
+    page = Namespace(name='page', default=0, dest="page", action='store', type=int)
     name = Namespace(name='name', default=0, dest="name", action='store', type=str)
-    public = Namespace(name='public', default=False, dest="public", action='store', type=bool)
-
+    access = Namespace(name='access', default=False, dest="access", action='store', type=bool)
     description = Namespace(name='description', default=0, dest="description", action='store', type=str)
 
-    categorie_id = Namespace(name='categorie_id', default=0, dest="categorie_id", action='store', type=int)
+    date_start = Namespace(name='date_start', default=0, dest="date_start", action='store', type=str)
+    date_end = Namespace(name='date_end', default=0, dest="date_end", action='store', type=str)
 
+    categorie_id = Namespace(name='categorie_id', default=0, dest="categorie_id", action='store', type=int)
     room_id = Namespace(name='room_id', default=None, dest="room_id", action='store', type=list, location='json')
     prestataire_id = Namespace(name='prestataire_id', default=None, dest="prestataire_id", action='store', type=list, location='json')
 
@@ -64,9 +67,11 @@ class UserEvent(Resource):
         parser.add_argument(**vars(self.__required__(self.name))) 
         parser.add_argument(**vars(self.__required__(self.description)))  
         parser.add_argument(**vars(self.__required__(self.categorie_id)))
+        parser.add_argument(**vars(self.__required__(self.date_start)))
+        parser.add_argument(**vars(self.__required__(self.date_end)))
         parser.add_argument(**vars(self.__optional__(self.room_id)))
         parser.add_argument(**vars(self.__optional__(self.prestataire_id)))
-        parser.add_argument(**vars(self.__optional__(self.public)))
+        parser.add_argument(**vars(self.__optional__(self.access)))
 
         try:
             data = parser.parse_args()
@@ -77,22 +82,30 @@ class UserEvent(Resource):
             abort(400, 'Missing required parameter in the JSON body')
         
         else:
+            data['date_start']=datetime.strptime(data['date_start'], '%Y-%m-%d %H').date()
+            data['date_end']=datetime.strptime(data['date_end'], '%Y-%m-%d %H').date()
 
-            if 'public' in data:
+            if 'access' in data:
                 if user.level != ADMIN_LEVEL:
-                    data.pop('public')
+                    data['access']=True
             if data['name'] == '':
-                abort(400, 'invalid name')
+                abort(400, 'invalid name') 
             if data['description'] == '':
                 abort(400, 'invalid description')
 
             rooms=[]
+            total_capacity = 0
             for room_id in data['room_id']:
                     room = Room.find_by_id(id=room_id)
                     if not room:
                         abort(405, 'Room could not be found')
                     else:
-                        rooms.append(room.id) 
+                        r_in_event = RoomInEvent.find_all_by_date(room_id=room.id, date_start=data['date_start'], date_end=data['date_end'])
+                        if r_in_event:
+                            abort(405, 'You cannot create an event at this date')
+
+                        rooms.append(room) 
+                        total_capacity+=room.capacity
 
             prestataires=[]
             for prestataire_id in data['prestataire_id']:
@@ -100,31 +113,37 @@ class UserEvent(Resource):
                     if not prestataire:
                         abort(405, 'Prestataire could not be found')
                     else:
+                        p_in_event = PrestataireInEvent.find_all_by_date(prestataire_id=prestataire.id, date_start=data['date_start'], date_end=data['date_end'])
+                        if p_in_event:
+                            abort(405, 'You cannot create an event at this date')
+
                         prestataires.append(prestataire.id) 
 
-            categorie = Categorie.find_by_id(id=data['categorie_id'])
+            categorie = Categorie.find_by_id(id=data['categorie_id']) 
             if not categorie:
                 abort(405, 'Categorie could not be found')
 
             event = Event(name=data['name'], 
                           description=data['description'], 
                           categorie_id=categorie.id,
-                          public=data['public']
+                          access=data['access'],
+                          total_capacity=total_capacity
                           )
-            
+            event.add_to_db()
+
             try:
                     json_room_list = []
-                    for room_id in rooms:
-                        room_in_event = RoomInEvent(room_id=room_id, event_id=event.id)
+                    for room in rooms:
+                        room_in_event = RoomInEvent(room_id=room.id, event_id=event.id, current_capacity=0, max_capacity=room.capacity, date_start=event.date_start, date_end=event.date_end)
                         room_in_event.add_to_db()
 
-                        room = Room.find_by_id(id=room_in_event.room_id)
+                        room = Room.find_by_id(id=room_in_event.room.id)
                         json_room=room.json()
                         json_room_list.append(json_room)
-                        
+                    
                     json_prestataire_list=[]
                     for prestataire_id in prestataires:
-                        prestataire_in_event = PrestataireInEvent(prestataire_id=prestataire_id, event_id=event.id)
+                        prestataire_in_event = PrestataireInEvent(prestataire_id=prestataire_id, event_id=event.id, date_start=event.date_start, date_end=event.date_end)
                         prestataire_in_event.add_to_db()
 
                         prestataire = Prestataire.find_by_id(id=prestataire_in_event.prestataire_id)
@@ -132,7 +151,6 @@ class UserEvent(Resource):
                         json_prestataire_list.append(json_prestataire)
 
                     event.add_to_db()
-                    
                     event_json = event.json(prestataire=json_prestataire_list, room=json_room_list)
  
             except Exception as e:
@@ -154,7 +172,8 @@ class UserEvent(Resource):
             :rtype: application/json.
         """
         parser = reqparse.RequestParser()
-        parser.add_argument(**vars(self.__required__(self.id)))
+        parser.add_argument(**vars(self.__optional__(self.id)))
+        parser.add_argument(**vars(self.__optional__(self.page)))
 
         try:
             data = parser.parse_args()
@@ -174,11 +193,8 @@ class UserEvent(Resource):
                 json_prestataire_list = []
 
                 if prestataire_in_event_list:
-                    for prestataire_id in prestataire_in_event_list:
-                        prestataire_in_event = PrestataireInEvent(prestataire_id=prestataire_id, event_id=event.id)
-                        prestataire_in_event.add_to_db()
-
-                        prestataire = Prestataire.find_by_id(id=prestataire_in_event.prestataire_id)
+                    for prestataire in prestataire_in_event_list:
+                        prestataire = Prestataire.find_by_id(id=prestataire.prestataire_id)
                         json_prestataire= prestataire.json()
                         json_prestataire_list.append(json_prestataire)
                 else:
@@ -188,11 +204,8 @@ class UserEvent(Resource):
                 json_room_list = []
 
                 if room_in_event_list:
-                    for room_id in room_in_event_list:
-                        room_in_event = RoomInEvent(room_id=room_id, event_id=event.id)
-                        room_in_event.add_to_db()
-
-                        room = Room.find_by_id(id=room_in_event.room_id)
+                    for room in room_in_event_list:
+                        room = Room.find_by_id(id=room.room_id)
                         json_room=room.json()
                         json_room_list.append(json_room)
 
@@ -201,12 +214,15 @@ class UserEvent(Resource):
 
                 categorie = Categorie.find_by_id(id=event.categorie_id) 
                 json_categorie = categorie.json()
-
+ 
                 json_event = event.json(prestataire=json_prestataire_list, categorie=json_categorie, room=json_room_list)
             
             else:
-                event_list=Event.find_all()
-                json_event = Event.all_json(event_list=event_list)
+                if not data['page']:                 
+                    data['page']=1
+
+                event_list=Event.find_all(page=data['page'])
+                json_event = Event.all_json(event_list=event_list, prestataire=json_prestataire_list, categorie=json_categorie, room=json_room_list)
 
             if not event:
                 abort(405, 'Event could not be found')
@@ -282,6 +298,8 @@ class UserEvent(Resource):
         """
         parser = reqparse.RequestParser()
         parser.add_argument(**vars(self.__required__(self.id)))
+        parser.add_argument(**vars(self.__optional__(self.date_start)))
+        parser.add_argument(**vars(self.__optional__(self.date_end)))
         parser.add_argument(**vars(self.__optional__(self.name)))
         parser.add_argument(**vars(self.__optional__(self.description)))
         parser.add_argument(**vars(self.__optional__(self.prestataire_id)))
@@ -297,22 +315,22 @@ class UserEvent(Resource):
             abort(400, dict(message='Missing required parameter in the JSON body'))
 
         else:
-            if 'public' in data:
+            if 'access' in data:
                 if user.level != ADMIN_LEVEL:
-                    data.pop('public')
-
-
+                    data.pop('access')
 
             #On teste si les room et les prestataire a patcher existe
             rooms=[]
+            total_capacity = 0
             if data['room_id']:
                 for room_id in data['room_id']:
                         room = Room.find_by_id(id=room_id)
                         if not room:
                             abort(405, 'Room could not be found')
                         else:
-                            rooms.append(room.id) 
-
+                            rooms.append(room) 
+                            total_capacity+=room.capacity
+            
             if data['prestataire_id']:
                 prestataires=[]
                 for prestataire_id in data['prestataire_id']:
@@ -330,21 +348,23 @@ class UserEvent(Resource):
 
             #On ajoute les nouelle room et les nouveaux prestataire dans l'event
             json_room_list=[]
-            for room_id in rooms:
-                room_in_event = RoomInEvent.find_by_room_event_id(event_id=event.id, room_id=room_id)
+            for room in rooms:
+                room_in_event = RoomInEvent.find_by_room_event_id(event_id=event.id, room_id=room.id)
                 if not room_in_event:
-                    room_in_event = RoomInEvent(room_id=room_id, event_id=event.id)
+                    room_in_event = RoomInEvent(room_id=room.id, event_id=event.id, current_capacity=0, max_capacity=room.capacity, date_start=event.date_start, date_end=event.date_end)
                     room_in_event.add_to_db()
                     
                 room = Room.find_by_id(id=room_in_event.room_id)
                 json_room=room.json()
                 json_room_list.append(json_room)
 
+            data['total_capacity']=total_capacity 
+
             json_prestataire_list=[]
             for prestataire_id in prestataires:
                 prestataire_in_event = PrestataireInEvent.find_by_prestataire_event_id(event_id=event.id, prestataire_id=prestataire_id)
                 if not prestataire_in_event:
-                    prestataire_in_event = PrestataireInEvent(prestataire_id=prestataire_id, event_id=event.id)
+                    prestataire_in_event = PrestataireInEvent(prestataire_id=prestataire_id, event_id=event.id, date_start=event.date_start, date_end=event.date_end)
                     prestataire_in_event.add_to_db()
                     
                 prestataire = Prestataire.find_by_id(id=prestataire_in_event.prestataire_id)
@@ -365,9 +385,9 @@ class UserEvent(Resource):
 
 
             if data['categorie_id']:
-                    categorie = Categorie.find_by_id(id=data['categorie_id'])
-                    if not categorie:
-                        abort(405, 'Categorie could not be found')
+                categorie = Categorie.find_by_id(id=data['categorie_id'])
+                if not categorie:
+                    abort(405, 'Categorie could not be found')
 
             del data["prestataire_id"]
             del data["room_id"]

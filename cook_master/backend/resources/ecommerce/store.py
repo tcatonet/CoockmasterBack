@@ -116,6 +116,8 @@ class StoreProduct(Resource):
             if data['page']:
                 if data['page'] < 1:
                     abort(400, 'Wrong page number')
+            else:
+                data['page']=1
 
             if data['min_price']:
                 if data['min_price'] < 0:
@@ -135,7 +137,6 @@ class StoreProduct(Resource):
   
             store_product = Store.find_by_name(name=data['name'])
             
-            
             if not store_product:
                 abort(404, dict(message='Store product could not be found')) 
 
@@ -144,7 +145,8 @@ class StoreProduct(Resource):
                 product_categorie_id=data['product_categorie_id'],
                 min_price=data['min_price'],  
                 max_price=data['max_price'],
-                min_note=data['note_min']
+                min_note=data['note_min'],
+                page=data['page']
                 )
             if not products:
                 abort(404, dict(message='Products could not be found'))

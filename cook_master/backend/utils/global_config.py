@@ -1,0 +1,5 @@
+ADMIN_LEVEL=100
+CLOSE = False
+
+PUBLIC=True
+PRIVATE=False

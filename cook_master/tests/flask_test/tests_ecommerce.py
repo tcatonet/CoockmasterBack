@@ -16,7 +16,7 @@ class Colors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-URL = 'http://172.18.0.3:5000/'
+URL = 'http://172.18.0.2:5000/'
 TOKEN = ""
 EMAIL_ADMIN = 'admin@admin.fr'
 
@@ -173,15 +173,16 @@ class TestEcommerceApplication:
                         json={'store_id': x.json()['id'], 'name': 'name product test2221', 'description': 'description product test', 'stock': 100, 'prix': 99.99},
                         headers={'Content-Type': 'Application/json', 'x-access-tokens': token}
                         ) 
-        
-        x = requests.get("".join((URL,'product')), json={'name': 'name product test2221'})
+        id1 = p.json()['id']
+
+        x = requests.get("".join((URL,'product')), json={'id': id1})
         assert x.status_code == 200
 
 
 
 
     def test_get_non_existing_product(self):
-        x = requests.get("".join((URL,'product')), json={'name': '1'})
+        x = requests.get("".join((URL,'product')), json={'id': -1})
         assert x.status_code == 405
 
     def test_delete_product(self):
@@ -689,11 +690,8 @@ class TestEcommerceApplication:
         x = requests.get("".join((URL,'store')), json={'name': 'test_get_product_store_with_note_filter', 'page': 1, 'note_min': 5})
 
         assert x.text == '{"products": [{"id": 35, "product_categorie_id": 0, "note": 9.0, "name": "test_get_product_store_with_note_filter2", "description": "description product test", "stock": 98, "prix": 99.99}, {"id": 34, "product_categorie_id": 0, "note": 5.0, "name": "test_get_product_store_with_note_filter1", "description": "description product test", "stock": 98, "prix": 99.99}]}'\
-            and x.status_code == 200
+           and x.status_code == 200
         
-
-
-
 
     def test_add_product_to_basket(self):
         ad = requests.post("".join((URL,'login')), headers={'Content-Type': 'Application/json'}, json={'email': EMAIL_ADMIN, 'password': 'admin'})
@@ -712,9 +710,9 @@ class TestEcommerceApplication:
                            headers={'Content-Type': 'Application/json', 'x-access-tokens': token_admin}
                            )
 
-        name = p1.json()['name']
-        p1 = requests.get("".join((URL,'product')), json={'name': name})
         id1 = p1.json()['id']
+
+        p1 = requests.get("".join((URL,'product')), json={'id': id1})
 
         x = requests.post("".join((URL,'user_basket')), 
                                 json={'product_id': id1, 'quantity':2}, 
@@ -1819,7 +1817,7 @@ class TestEcommerceApplication:
                                 headers={'Content-Type': 'Application/json', 'x-access-tokens': token}
                           )
 
-        x = requests.get("".join((URL,'product')), json={'name': 'test_get_avis_from_product'})
+        x = requests.get("".join((URL,'product')), json={'id': id1})
 
 
         assert x.status_code == 200
@@ -1934,7 +1932,8 @@ class TestEcommerceApplication:
                                 json={'product_in_order_id': id, 'product_id': id1, 'comentary': 'c pas kool', 'note': 3}, 
                                 headers={'Content-Type': 'Application/json', 'x-access-tokens': token}
                           )
-        x = requests.get("".join((URL,'product')), json={'name': 'test_get_note_from_product'})
-        note = x.json()['note']
 
+
+        x = requests.get("".join((URL,'product')), json={'id': id1})
+        note = x.json()['note']
         assert note == round((9+3+7)/3,2)

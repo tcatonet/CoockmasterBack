@@ -6,6 +6,7 @@ import json
 import copy
 import logging
 import re
+from datetime import datetime
 
 from argparse import Namespace
 from flask import abort, current_app
@@ -21,10 +22,13 @@ class CompanyRoom(Resource):
     """ Room endpoint. """
 
     id = Namespace(name='id', default=0, dest="id", action='store', type=int)
+    page = Namespace(name='page', default=0, dest="page", action='store', type=int)
     city = Namespace(name='city', default=0, dest="city", action='store', type=str)
     postcode = Namespace(name='postcode', default=0, dest="postcode", action='store', type=str)
     adress = Namespace(name='adress', default=0, dest="adress", action='store', type=str)
     capacity = Namespace(name='capacity', default=0, dest="capacity", action='store', type=int)
+    date_start = Namespace(name='date_start', default=0, dest="date_start", action='store', type=str)
+    date_end = Namespace(name='date_end', default=0, dest="date_end", action='store', type=str)
 
  
     @staticmethod
@@ -105,6 +109,10 @@ class CompanyRoom(Resource):
         """
         parser = reqparse.RequestParser()
         parser.add_argument(**vars(self.__optional__(self.id)))
+        parser.add_argument(**vars(self.__optional__(self.page)))
+        parser.add_argument(**vars(self.__optional__(self.date_start)))
+        parser.add_argument(**vars(self.__optional__(self.date_end)))
+
 
         try: 
             data = parser.parse_args()
@@ -119,14 +127,23 @@ class CompanyRoom(Resource):
                 room = Room.find_by_id(id=data['id'])
                 if not room:
                     abort(404, dict(message='Room could not be found'))
-
                 try:
                     json_room = room.json()
                 except Exception as e:
                     logging.error(e) 
                     abort(422, 'An error occurred getting the room')
-            else:  
-                room_list = Room.find_all() 
+            else:
+                if not data['page']:
+                    data['page']=1
+
+                if data['date_start'] and data['date_end']:
+                    data['date_start']=datetime.strptime(data['date_start'], '%Y-%m-%d %H').date()
+                    data['date_end']=datetime.strptime(data['date_end'], '%Y-%m-%d %H').date()
+                    room_list = Room.find_all_by_date(page=data['page'], date_start=data['date_start'], date_end=data['date_end']) 
+
+                else:
+                    room_list = Room.find_all(page=data['page']) 
+
                 if not room_list:
                     abort(404, dict(message='Room list could not be found'))
 
